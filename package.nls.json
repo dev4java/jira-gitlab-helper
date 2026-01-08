@@ -1,0 +1,34 @@
+{
+  "extension.description": "Intelligent integration of Jira and GitLab with AI assistance for automated workflow from requirement analysis to code generation",
+  
+  "command.openConfig": "Open Configuration Panel",
+  "command.configureJira": "Configure Jira Connection",
+  "command.configureGitlab": "Configure GitLab Connection",
+  "command.fetchJiraIssue": "Fetch Jira Issue",
+  "command.fetchJiraBugList": "Fetch Bug List",
+  "command.analyzeRequirement": "Analyze Requirement",
+  "command.analyzeBug": "Analyze Bug",
+  "command.generateCode": "Generate Code",
+  "command.commitCode": "Commit Code",
+  "command.createMR": "Create Merge Request",
+  "command.handleCRSuggestions": "Handle Code Review Suggestions",
+  
+  "view.jiraIssues": "Jira Issues",
+  "view.tasks": "Task Progress",
+  
+  "config.jira.serverUrl": "Jira server URL (e.g., https://your-company.atlassian.net)",
+  "config.jira.username": "Jira username",
+  "config.jira.authType": "Jira authentication type",
+  "config.gitlab.serverUrl": "GitLab server URL (e.g., https://gitlab.com)",
+  "config.gitlab.defaultTargetBranch": "GitLab default target branch",
+  "config.confluence.enabled": "Enable Confluence integration",
+  "config.confluence.serverUrl": "Confluence server URL (e.g., https://your-company.atlassian.net/wiki)",
+  "config.confluence.username": "Confluence username",
+  "config.confluence.authType": "Confluence authentication type",
+  "config.ai.provider": "AI service provider",
+  "config.ai.endpoint": "AI service endpoint (for custom provider)",
+  "config.ai.model": "AI model name",
+  "config.general.autoCreateBranch": "Automatically create Git branch",
+  "config.general.autoCommit": "Automatically commit code",
+  "config.general.debugMode": "Debug mode"
+}

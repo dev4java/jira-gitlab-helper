@@ -1,0 +1,19 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g fill="#0052CC">
+    <!-- Top dots -->
+    <circle cx="6" cy="3" r="1.5"/>
+    <circle cx="12" cy="3" r="1.5"/>
+    <circle cx="18" cy="3" r="1.5"/>
+    
+    <!-- Main X shape -->
+    <path d="M4 8 L7 11 L7 17 L4 20 L1 17 L1 11 Z"/>
+    <path d="M20 8 L23 11 L23 17 L20 20 L17 17 L17 11 Z"/>
+    
+    <!-- Center V shape -->
+    <path d="M12 14 L8 18 L12 22 L16 18 Z"/>
+    
+    <!-- Arms -->
+    <path d="M7 11 L10 14 L12 12 L9 9 Z"/>
+    <path d="M17 11 L14 14 L12 12 L15 9 Z"/>
+  </g>
+</svg>

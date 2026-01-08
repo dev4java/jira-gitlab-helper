@@ -1,0 +1,48 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- 白色背景圆 -->
+  <circle cx="64" cy="64" r="60" fill="#FFFFFF" stroke="#E0E0E0" stroke-width="2"/>
+  
+  <!-- 左半部分遮罩 - 用于Jira -->
+  <defs>
+    <clipPath id="leftHalf">
+      <rect x="0" y="0" width="64" height="128"/>
+    </clipPath>
+    <clipPath id="rightHalf">
+      <rect x="64" y="0" width="64" height="128"/>
+    </clipPath>
+  </defs>
+  
+  <!-- 左侧 - Jira图标区域 -->
+  <g clip-path="url(#leftHalf)">
+    <circle cx="64" cy="64" r="60" fill="#F4F5F7"/>
+    <!-- Jira标志 -->
+    <g transform="translate(32, 64)">
+      <path d="M 0 -25 L -18 -7 L -18 7 L 0 25 L 18 7 L 18 -7 Z" fill="#2684FF"/>
+      <path d="M 0 -25 L 0 -7 L 18 7 L 18 -7 Z" fill="#0052CC"/>
+    </g>
+  </g>
+  
+  <!-- 右侧 - GitLab图标区域 -->
+  <g clip-path="url(#rightHalf)">
+    <circle cx="64" cy="64" r="60" fill="#FFFFFF"/>
+    <!-- GitLab狐狸 -->
+    <g transform="translate(96, 64)">
+      <!-- 中心 -->
+      <path d="M 0 -18 L 10 8 L -10 8 Z" fill="#E24329"/>
+      <!-- 左翼 -->
+      <path d="M -10 8 L -18 -8 L -10 -8 Z" fill="#FC6D26"/>
+      <!-- 右翼 -->
+      <path d="M 10 8 L 18 -8 L 10 -8 Z" fill="#FC6D26"/>
+      <!-- 头顶 -->
+      <path d="M -10 -8 L 0 -22 L 10 -8 Z" fill="#FCA326"/>
+      <!-- 底部 -->
+      <path d="M -10 8 L 0 18 L 10 8 Z" fill="#E24329"/>
+    </g>
+  </g>
+  
+  <!-- 中间分割线 -->
+  <line x1="64" y1="4" x2="64" y2="124" stroke="#E0E0E0" stroke-width="2"/>
+  
+  <!-- 外边框 -->
+  <circle cx="64" cy="64" r="60" fill="none" stroke="#E0E0E0" stroke-width="2"/>
+</svg>

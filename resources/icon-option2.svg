@@ -1,0 +1,30 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- 左半圆 - Jira蓝色 -->
+  <path d="M 64 4 A 60 60 0 0 1 64 124 L 64 64 Z" fill="#2684FF"/>
+  
+  <!-- 右半圆 - GitLab橙色 -->
+  <path d="M 64 4 A 60 60 0 0 0 64 124 L 64 64 Z" fill="#FC6D26"/>
+  
+  <!-- 左侧 - Jira图标（白色） -->
+  <g transform="translate(36, 64)">
+    <path d="M 0 -20 L -14 -6 L -14 6 L 0 20 L 14 6 L 14 -6 Z" fill="#FFFFFF"/>
+    <path d="M 0 -20 L 0 -6 L 14 6 L 14 -6 Z" fill="#FFFFFF" opacity="0.7"/>
+  </g>
+  
+  <!-- 右侧 - GitLab狐狸（白色） -->
+  <g transform="translate(92, 64)">
+    <!-- 中心 -->
+    <path d="M 0 -15 L 8 6 L -8 6 Z" fill="#FFFFFF"/>
+    <!-- 左翼 -->
+    <path d="M -8 6 L -14 -6 L -8 -6 Z" fill="#FFFFFF" opacity="0.8"/>
+    <!-- 右翼 -->
+    <path d="M 8 6 L 14 -6 L 8 -6 Z" fill="#FFFFFF" opacity="0.8"/>
+    <!-- 头顶 -->
+    <path d="M -8 -6 L 0 -18 L 8 -6 Z" fill="#FFFFFF" opacity="0.9"/>
+    <!-- 底部 -->
+    <path d="M -8 6 L 0 14 L 8 6 Z" fill="#FFFFFF"/>
+  </g>
+  
+  <!-- 外边框 -->
+  <circle cx="64" cy="64" r="60" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+</svg>

@@ -1,0 +1,249 @@
+{
+  "name": "jira-gitlab-helper",
+  "displayName": "Jira GitLab Helper",
+  "description": "Intelligent integration of Jira and GitLab with AI assistance for automated workflow from requirement analysis to code generation | 智能集成Jira和GitLab，通过AI辅助实现从需求分析到代码生成的全流程自动化开发工作流",
+  "version": "1.0.4",
+  "publisher": "yusw",
+  "icon": "resources/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dev4java/jira-gitlab-helper.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dev4java/jira-gitlab-helper/issues"
+  },
+  "homepage": "https://github.com/dev4java/jira-gitlab-helper#readme",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "SCM Providers",
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "jira",
+    "gitlab",
+    "ai",
+    "code review",
+    "bug analysis",
+    "requirement analysis",
+    "openspec",
+    "confluence",
+    "devops",
+    "automation"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "jiraGitlabHelper.openConfig",
+        "title": "%command.openConfig%",
+        "category": "Jira GitLab Helper",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "jiraGitlabHelper.configureJira",
+        "title": "%command.configureJira%",
+        "category": "Jira GitLab Helper"
+      },
+      {
+        "command": "jiraGitlabHelper.configureGitlab",
+        "title": "%command.configureGitlab%",
+        "category": "Jira GitLab Helper"
+      },
+      {
+        "command": "jiraGitlabHelper.fetchJiraIssue",
+        "title": "%command.fetchJiraIssue%",
+        "category": "Jira GitLab Helper"
+      },
+      {
+        "command": "jiraGitlabHelper.fetchJiraBugList",
+        "title": "%command.fetchJiraBugList%",
+        "category": "Jira GitLab Helper",
+        "icon": "$(bug)"
+      },
+      {
+        "command": "jiraGitlabHelper.analyzeRequirement",
+        "title": "%command.analyzeRequirement%",
+        "category": "Jira GitLab Helper"
+      },
+      {
+        "command": "jiraGitlabHelper.analyzeBug",
+        "title": "%command.analyzeBug%",
+        "category": "Jira GitLab Helper"
+      },
+      {
+        "command": "jiraGitlabHelper.generateCode",
+        "title": "%command.generateCode%",
+        "category": "Jira GitLab Helper"
+      },
+      {
+        "command": "jiraGitlabHelper.commitCode",
+        "title": "%command.commitCode%",
+        "category": "Jira GitLab Helper"
+      },
+      {
+        "command": "jiraGitlabHelper.createMR",
+        "title": "%command.createMR%",
+        "category": "Jira GitLab Helper"
+      },
+      {
+        "command": "jiraGitlabHelper.handleCRSuggestions",
+        "title": "%command.handleCRSuggestions%",
+        "category": "Jira GitLab Helper"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "jiraGitlabHelper",
+          "title": "Jira GitLab Helper",
+          "icon": "resources/jira-gitlab-helper-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "jiraGitlabHelper": [
+        {
+          "id": "jiraGitlabHelperJiraIssues",
+          "name": "%view.jiraIssues%"
+        },
+        {
+          "id": "jiraGitlabHelperTasks",
+          "name": "%view.tasks%"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Jira GitLab Helper",
+      "properties": {
+        "jiraGitlabHelper.jira.serverUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%config.jira.serverUrl%"
+        },
+        "jiraGitlabHelper.jira.username": {
+          "type": "string",
+          "default": "",
+          "description": "%config.jira.username%"
+        },
+        "jiraGitlabHelper.jira.authType": {
+          "type": "string",
+          "enum": [
+            "password",
+            "apiToken"
+          ],
+          "default": "apiToken",
+          "description": "%config.jira.authType%"
+        },
+        "jiraGitlabHelper.gitlab.serverUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%config.gitlab.serverUrl%"
+        },
+        "jiraGitlabHelper.gitlab.defaultTargetBranch": {
+          "type": "string",
+          "default": "main",
+          "description": "%config.gitlab.defaultTargetBranch%"
+        },
+        "jiraGitlabHelper.confluence.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.confluence.enabled%"
+        },
+        "jiraGitlabHelper.confluence.serverUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%config.confluence.serverUrl%"
+        },
+        "jiraGitlabHelper.confluence.username": {
+          "type": "string",
+          "default": "",
+          "description": "%config.confluence.username%"
+        },
+        "jiraGitlabHelper.confluence.authType": {
+          "type": "string",
+          "enum": [
+            "password",
+            "apiToken"
+          ],
+          "default": "apiToken",
+          "description": "%config.confluence.authType%"
+        },
+        "jiraGitlabHelper.ai.provider": {
+          "type": "string",
+          "enum": [
+            "mcp",
+            "openai",
+            "custom"
+          ],
+          "default": "mcp",
+          "description": "%config.ai.provider%"
+        },
+        "jiraGitlabHelper.ai.endpoint": {
+          "type": "string",
+          "default": "",
+          "description": "%config.ai.endpoint%"
+        },
+        "jiraGitlabHelper.ai.model": {
+          "type": "string",
+          "default": "gpt-4",
+          "description": "%config.ai.model%"
+        },
+        "jiraGitlabHelper.general.autoCreateBranch": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.general.autoCreateBranch%"
+        },
+        "jiraGitlabHelper.general.autoCommit": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.general.autoCommit%"
+        },
+        "jiraGitlabHelper.general.debugMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.general.debugMode%"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "lint:fix": "eslint src --ext ts --fix",
+    "test": "node ./dist/test/runTest.js",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "package": "vsce package --no-yarn",
+    "publish": "vsce publish",
+    "package:patch": "npm version patch && npm run package",
+    "package:minor": "npm version minor && npm run package",
+    "package:major": "npm version major && npm run package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vscode/test-electron": "^2.3.0",
+    "eslint": "^8.45.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.1.0"
+  },
+  "dependencies": {
+    "@gitbeaker/node": "^35.8.0",
+    "axios": "^1.4.0",
+    "jira-client": "^8.2.2"
+  }
+}

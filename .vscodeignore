@@ -1,0 +1,29 @@
+.vscode/**
+.vscode-test/**
+src/**
+test/**
+.gitignore
+.eslintrc.json
+.prettierrc.json
+tsconfig.json
+**/*.map
+**/*.ts
+!dist/**/*.js
+
+# OpenSpec directory
+openspec/**
+
+# Build and package files
+*.vsix
+package-lock.json
+
+# Amazon Q
+.amazonq/**
+
+# Git
+.git/**
+.gitattributes
+
+# Development files
+.editorconfig
+.nvmrc
