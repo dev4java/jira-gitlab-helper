@@ -79,10 +79,11 @@ export class AnalyzeRequirementCommand {
               '是否现在安装OpenSpec？',
               { modal: true },
               '安装OpenSpec',
-              '跳过（仅AI分析）'
+              '跳过（仅AI分析）',
+              '取消'
             );
 
-            if (!installChoice) {
+            if (!installChoice || installChoice === '取消') {
               void vscode.window.showInformationMessage('已取消需求分析');
               return;
             } else if (installChoice === '安装OpenSpec') {
@@ -107,8 +108,8 @@ export class AnalyzeRequirementCommand {
                     '• 环境变量未生效\n\n' +
                     '您可以：',
                     { modal: true },
-                    '重新加载窗口',
                     '继续基础分析',
+                    '重新加载窗口',
                     '取消'
                   );
                   
@@ -256,7 +257,7 @@ export class AnalyzeRequirementCommand {
               `您可以查看分析内容后继续进行代码生成。`,
               { modal: true },
               '继续生成代码',
-              '关闭'
+              '取消'
             );
             
             if (nextAction === '继续生成代码') {
@@ -487,9 +488,9 @@ export class AnalyzeRequirementCommand {
         '  pnpm add -g openspec\n\n' +
         '安装完成后，请重新加载窗口或重启Cursor。',
         { modal: true },
-        '打开终端',
         '复制命令',
-        '关闭'
+        '打开终端',
+        '取消'
       ).then(async (action) => {
         if (action === '打开终端') {
           const terminal = vscode.window.createTerminal('OpenSpec 安装');

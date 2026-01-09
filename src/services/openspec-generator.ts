@@ -22,21 +22,25 @@ export class OpenSpecGenerator {
     try {
       this._logger.debug('Checking if OpenSpec CLI is installed');
       
-      const { stdout } = await execAsync('openspec --version', {
+      const { stdout, stderr } = await execAsync('openspec --version', {
         timeout: 5000,
       });
 
       this._isOpenSpecInstalled = !!stdout && stdout.includes('openspec');
       
       if (this._isOpenSpecInstalled) {
-        this._logger.info('OpenSpec CLI detected', { version: stdout.trim() });
+        this._logger.info('✅ OpenSpec CLI detected', { version: stdout.trim() });
       } else {
-        this._logger.info('OpenSpec CLI not installed');
+        this._logger.warn('OpenSpec CLI command executed but output unexpected', { stdout, stderr });
       }
 
       return this._isOpenSpecInstalled;
-    } catch (error) {
-      this._logger.info('OpenSpec CLI not found in PATH');
+    } catch (error: any) {
+      this._logger.warn('❌ OpenSpec CLI not found in PATH', {
+        error: error.message,
+        code: error.code,
+        hint: 'Please install OpenSpec CLI globally: npm install -g openspec'
+      });
       this._isOpenSpecInstalled = false;
       return false;
     }
