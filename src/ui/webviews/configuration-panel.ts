@@ -127,6 +127,21 @@ export class ConfigurationPanel {
         },
       };
 
+      this._logger.info('Loading configuration', {
+        jira: {
+          configured: !!(currentConfig.jira.serverUrl && currentConfig.jira.username),
+        },
+        gitlab: {
+          configured: !!currentConfig.gitlab.serverUrl,
+        },
+        confluence: {
+          enabled: currentConfig.confluence.enabled,
+          serverUrl: currentConfig.confluence.serverUrl ? '***' : '(empty)',
+          username: currentConfig.confluence.username ? '***' : '(empty)',
+          hasPassword: !!currentConfig.confluence.password,
+        },
+      });
+
       this._panel.webview.postMessage({
         command: 'configLoaded',
         data: currentConfig,
@@ -220,6 +235,13 @@ export class ConfigurationPanel {
 
   private async _saveConfluenceConfig(data: any): Promise<void> {
     try {
+      this._logger.info('Saving Confluence configuration', {
+        enabled: data.enabled,
+        serverUrl: data.serverUrl ? '***' : '(empty)',
+        username: data.username ? '***' : '(empty)',
+        hasPassword: !!data.password,
+      });
+
       const config = vscode.workspace.getConfiguration('jiraGitlabHelper');
 
       await config.update(
@@ -245,6 +267,9 @@ export class ConfigurationPanel {
 
       if (data.password) {
         await this._configManager.setConfluenceCredential(data.password);
+        this._logger.info('Confluence credential saved to SecretStorage');
+      } else {
+        this._logger.info('No password provided, credential not updated');
       }
 
       this._panel.webview.postMessage({
@@ -253,7 +278,7 @@ export class ConfigurationPanel {
         message: 'Confluence配置已保存',
       });
 
-      this._logger.info('Confluence configuration saved');
+      this._logger.info('Confluence configuration saved successfully');
     } catch (error) {
       this._logger.error('Failed to save Confluence config', error);
       this._panel.webview.postMessage({

@@ -202,12 +202,6 @@ export class AnalyzeRequirementCommand {
           progress.report({ message: '正在分析需求内容...' });
           const analysis = await this._requirementAnalysisService.analyzeRequirement(issue!);
 
-          // Show analysis results
-          const proceed = await this.showAnalysisResults(issue!, analysis);
-          if (!proceed) {
-            return;
-          }
-
           // If OpenSpec is not installed, save analysis to markdown and show to user
           if (!isOpenSpecInstalled) {
             this._logger.info('Requirement analysis completed without OpenSpec', {
@@ -270,6 +264,12 @@ export class AnalyzeRequirementCommand {
               await vscode.commands.executeCommand('jiraGitlabHelper.generateCode', issue, analysis);
             }
             
+            return;
+          }
+
+          // Show analysis results and ask for confirmation (only when OpenSpec is installed)
+          const proceed = await this.showAnalysisResults(issue!, analysis);
+          if (!proceed) {
             return;
           }
 
