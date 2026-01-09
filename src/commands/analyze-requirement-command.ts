@@ -45,8 +45,7 @@ export class AnalyzeRequirementCommand {
       const confirmBranch = await vscode.window.showWarningMessage(
         `当前分支: ${currentBranch}\n\n是否在此分支上进行需求分析和代码生成？`,
         { modal: true },
-        '确认',
-        '取消'
+        '确认'
       );
 
       if (confirmBranch !== '确认') {
@@ -78,12 +77,11 @@ export class AnalyzeRequirementCommand {
               '注意：跳过OpenSpec不影响基础的AI分析和代码生成功能。\n\n' +
               '是否现在安装OpenSpec？',
               { modal: true },
-              '安装OpenSpec',
               '跳过（仅AI分析）',
-              '取消'
+              '安装OpenSpec'
             );
 
-            if (!installChoice || installChoice === '取消') {
+            if (!installChoice) {
               void vscode.window.showInformationMessage('已取消需求分析');
               return;
             } else if (installChoice === '安装OpenSpec') {
@@ -108,15 +106,14 @@ export class AnalyzeRequirementCommand {
                     '• 环境变量未生效\n\n' +
                     '您可以：',
                     { modal: true },
-                    '继续基础分析',
                     '重新加载窗口',
-                    '取消'
+                    '继续基础分析'
                   );
                   
                   if (retryChoice === '重新加载窗口') {
                     await vscode.commands.executeCommand('workbench.action.reloadWindow');
                     return;
-                  } else if (retryChoice === '取消') {
+                  } else if (!retryChoice) {
                     void vscode.window.showInformationMessage('已取消需求分析');
                     return;
                   }
@@ -256,8 +253,7 @@ export class AnalyzeRequirementCommand {
               `分析结果已保存为Markdown文档并已打开。\n` +
               `您可以查看分析内容后继续进行代码生成。`,
               { modal: true },
-              '继续生成代码',
-              '取消'
+              '继续生成代码'
             );
             
             if (nextAction === '继续生成代码') {
@@ -488,9 +484,8 @@ export class AnalyzeRequirementCommand {
         '  pnpm add -g openspec\n\n' +
         '安装完成后，请重新加载窗口或重启Cursor。',
         { modal: true },
-        '复制命令',
         '打开终端',
-        '取消'
+        '复制命令'
       ).then(async (action) => {
         if (action === '打开终端') {
           const terminal = vscode.window.createTerminal('OpenSpec 安装');
@@ -517,8 +512,7 @@ export class AnalyzeRequirementCommand {
         '请等待安装完成（通常需要1-2分钟）。\n\n' +
         '安装完成后请点击"已完成"按钮。',
         { modal: true },
-        '已完成',
-        '取消'
+        '已完成'
       );
 
       if (result === '已完成') {
