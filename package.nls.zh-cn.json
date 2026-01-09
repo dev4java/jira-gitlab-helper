@@ -20,6 +20,7 @@
   "config.jira.username": "Jira用户名",
   "config.jira.authType": "Jira认证方式",
   "config.gitlab.serverUrl": "GitLab服务器地址 (例如: https://gitlab.com)",
+  "config.gitlab.defaultProjectId": "GitLab默认项目ID (可选)",
   "config.gitlab.defaultTargetBranch": "GitLab默认目标分支",
   "config.confluence.enabled": "启用Confluence集成",
   "config.confluence.serverUrl": "Confluence服务器地址 (例如: https://your-company.atlassian.net/wiki)",

@@ -20,6 +20,7 @@
   "config.jira.username": "Jira username",
   "config.jira.authType": "Jira authentication type",
   "config.gitlab.serverUrl": "GitLab server URL (e.g., https://gitlab.com)",
+  "config.gitlab.defaultProjectId": "GitLab default project ID (optional)",
   "config.gitlab.defaultTargetBranch": "GitLab default target branch",
   "config.confluence.enabled": "Enable Confluence integration",
   "config.confluence.serverUrl": "Confluence server URL (e.g., https://your-company.atlassian.net/wiki)",

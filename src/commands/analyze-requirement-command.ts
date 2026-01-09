@@ -4,6 +4,7 @@ import { JiraService } from '../services/jira-service';
 import { GitService } from '../services/git-service';
 import { Logger } from '../utils/logger';
 import { IJiraIssue } from '../models/jira-issue';
+import { IRequirementAnalysis } from '../models/requirement-analysis';
 
 export class AnalyzeRequirementCommand {
   constructor(
@@ -72,8 +73,9 @@ export class AnalyzeRequirementCommand {
             const installChoice = await vscode.window.showWarningMessage(
               '未检测到OpenSpec CLI工具\n\n' +
               'OpenSpec用于生成规范化的需求文档和规格说明。\n\n' +
-              '• 如果安装：将生成完整的OpenSpec文档\n' +
-              '• 如果跳过：只进行AI需求分析（基础功能）\n\n' +
+              '• 如果安装：将生成完整的OpenSpec文档（推荐）\n' +
+              '• 如果跳过：只进行AI需求分析，不生成OpenSpec文档\n\n' +
+              '注意：跳过OpenSpec不影响基础的AI分析和代码生成功能。\n\n' +
               '是否现在安装OpenSpec？',
               { modal: true },
               '安装OpenSpec',
@@ -81,7 +83,7 @@ export class AnalyzeRequirementCommand {
               '取消'
             );
 
-            if (installChoice === '取消') {
+            if (installChoice === '取消' || !installChoice) {
               void vscode.window.showInformationMessage('已取消需求分析');
               return;
             } else if (installChoice === '安装OpenSpec') {
@@ -89,23 +91,48 @@ export class AnalyzeRequirementCommand {
               const installMethod = await this.promptOpenSpecInstallation();
               
               if (installMethod === 'installed') {
-                // 重新检测
+                // 重新检测并验证安装
+                this._logger.info('Re-checking OpenSpec installation after user confirmation');
                 this._requirementAnalysisService.resetOpenSpecCache();
                 isOpenSpecInstalled = await this._requirementAnalysisService.isOpenSpecInstalled();
                 
                 if (isOpenSpecInstalled) {
-                  void vscode.window.showInformationMessage('✅ OpenSpec安装成功！');
+                  void vscode.window.showInformationMessage('✅ OpenSpec CLI 安装成功！现在将生成完整的需求规格文档。');
+                  this._logger.info('OpenSpec installation verified successfully');
                 } else {
-                  void vscode.window.showWarningMessage(
-                    '未检测到OpenSpec，将继续执行基础分析。\n\n' +
-                    '如果已安装，请重启Cursor或重新加载窗口。'
+                  const retryChoice = await vscode.window.showWarningMessage(
+                    '⚠️ 未检测到OpenSpec CLI\n\n' +
+                    '可能的原因：\n' +
+                    '• 安装尚未完成或失败\n' +
+                    '• 需要重新加载窗口\n' +
+                    '• 环境变量未生效\n\n' +
+                    '您可以：',
+                    { modal: true },
+                    '重新加载窗口',
+                    '继续基础分析',
+                    '取消'
                   );
+                  
+                  if (retryChoice === '重新加载窗口') {
+                    await vscode.commands.executeCommand('workbench.action.reloadWindow');
+                    return;
+                  } else if (retryChoice === '取消') {
+                    void vscode.window.showInformationMessage('已取消需求分析');
+                    return;
+                  }
+                  // 选择"继续基础分析"，isOpenSpecInstalled 保持 false
+                  this._logger.info('User chose to continue with basic analysis without OpenSpec');
                 }
               } else if (installMethod === 'cancelled') {
                 void vscode.window.showInformationMessage('已取消需求分析');
                 return;
               }
               // 如果是 'skip'，继续执行基础分析
+              if (installMethod === 'skip') {
+                this._logger.info('User skipped OpenSpec installation, continuing with basic analysis');
+              }
+            } else if (installChoice === '跳过（仅AI分析）') {
+              this._logger.info('User chose to skip OpenSpec and use basic AI analysis only');
             }
             // 如果选择"跳过"，isOpenSpecInstalled保持false，继续执行
           }
@@ -182,14 +209,57 @@ export class AnalyzeRequirementCommand {
             return;
           }
 
-          // If OpenSpec is not installed, stop here
+          // If OpenSpec is not installed, provide basic analysis results and options
           if (!isOpenSpecInstalled) {
-            void vscode.window.showInformationMessage(
-              `需求分析完成: ${issue!.key}\n\n建议功能: ${analysis.suggestedChangeId}\n复杂度: ${analysis.estimatedComplexity}\n\n提示: 安装OpenSpec CLI以生成完整的规格文档`
-            );
-            this._logger.info('Requirement analysis completed (without OpenSpec)', {
+            this._logger.info('Requirement analysis completed without OpenSpec', {
               issueKey: issue!.key,
+              changeId: analysis.suggestedChangeId,
+              complexity: analysis.estimatedComplexity,
             });
+            
+            const nextAction = await vscode.window.showInformationMessage(
+              `✅ 需求分析完成: ${issue!.key}\n\n` +
+              `建议功能: ${analysis.suggestedChangeId}\n` +
+              `复杂度: ${analysis.estimatedComplexity}\n\n` +
+              `💡 提示: 当前使用基础AI分析模式\n` +
+              `安装OpenSpec CLI可生成更完整的规格文档和任务列表。\n\n` +
+              `您可以继续进行代码生成，或查看详细分析结果。`,
+              { modal: true },
+              '开始生成代码',
+              '查看详细分析',
+              '安装OpenSpec',
+              '关闭'
+            );
+            
+            if (nextAction === '开始生成代码') {
+              // 直接使用分析结果生成代码（不需要完整的OpenSpec提案）
+              await vscode.commands.executeCommand('jiraGitlabHelper.generateCode', issue, analysis);
+            } else if (nextAction === '查看详细分析') {
+              // 在输出通道显示详细分析
+              const analysisText = this.formatAnalysisForDisplay(issue!, analysis);
+              const doc = await vscode.workspace.openTextDocument({
+                content: analysisText,
+                language: 'markdown',
+              });
+              await vscode.window.showTextDocument(doc, { preview: true });
+            } else if (nextAction === '安装OpenSpec') {
+              // 引导用户安装OpenSpec并重新运行
+              await vscode.window.showInformationMessage(
+                '请按以下步骤安装OpenSpec:\n\n' +
+                '1. 在终端运行: npm install -g openspec\n' +
+                '2. 等待安装完成\n' +
+                '3. 重新加载窗口或重启Cursor\n' +
+                '4. 重新运行"分析需求"命令',
+                '打开终端'
+              ).then((action) => {
+                if (action === '打开终端') {
+                  const terminal = vscode.window.createTerminal('OpenSpec 安装');
+                  terminal.show();
+                  terminal.sendText('npm install -g openspec');
+                }
+              });
+            }
+            
             return;
           }
 
@@ -453,5 +523,77 @@ export class AnalyzeRequirementCommand {
   private getWorkspaceUri(): vscode.Uri | undefined {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     return workspaceFolders && workspaceFolders.length > 0 ? workspaceFolders[0].uri : undefined;
+  }
+
+  private formatAnalysisForDisplay(issue: IJiraIssue, analysis: IRequirementAnalysis): string {
+    const lines: string[] = [
+      `# 需求分析报告: ${issue.key}`,
+      '',
+      `**标题**: ${issue.summary}`,
+      `**类型**: ${issue.type}`,
+      `**状态**: ${issue.status}`,
+      `**优先级**: ${issue.priority}`,
+      '',
+      '---',
+      '',
+      `## 目标`,
+      '',
+      analysis.goal,
+      '',
+      '## 需求描述',
+      '',
+      analysis.description || issue.description,
+      '',
+      '## 建议功能模块',
+      '',
+      `**Change ID**: ${analysis.suggestedChangeId}`,
+      `**复杂度**: ${analysis.estimatedComplexity}`,
+      `**是否需要设计文档**: ${analysis.needsDesignDoc ? '是' : '否'}`,
+      '',
+      '## 验收标准',
+      '',
+    ];
+
+    if (analysis.acceptanceCriteria && analysis.acceptanceCriteria.length > 0) {
+      analysis.acceptanceCriteria.forEach((criterion: string, index: number) => {
+        lines.push(`${index + 1}. ${criterion}`);
+      });
+    } else {
+      lines.push('暂无验收标准');
+    }
+
+    lines.push('', '## 技术约束', '');
+
+    if (analysis.technicalConstraints && analysis.technicalConstraints.length > 0) {
+      analysis.technicalConstraints.forEach((constraint: string, index: number) => {
+        lines.push(`${index + 1}. ${constraint}`);
+      });
+    } else {
+      lines.push('暂无技术约束');
+    }
+
+    lines.push('', '## 依赖项', '');
+
+    if (analysis.dependencies && analysis.dependencies.length > 0) {
+      analysis.dependencies.forEach((dep: string) => {
+        lines.push(`- ${dep}`);
+      });
+    } else {
+      lines.push('无依赖项');
+    }
+
+    lines.push('', '## 影响的功能', '');
+
+    if (analysis.affectedCapabilities && analysis.affectedCapabilities.length > 0) {
+      analysis.affectedCapabilities.forEach((capability: string) => {
+        lines.push(`- ${capability}`);
+      });
+    } else {
+      lines.push('无影响的功能');
+    }
+
+    lines.push('', '---', '', '_此分析由 Jira GitLab Helper 基于 AI 生成_', '', '💡 **提示**: 安装 OpenSpec CLI 可以生成更详细的任务列表和规格文档。');
+
+    return lines.join('\n');
   }
 }

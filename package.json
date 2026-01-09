@@ -146,6 +146,11 @@
           "default": "",
           "description": "%config.gitlab.serverUrl%"
         },
+        "jiraGitlabHelper.gitlab.defaultProjectId": {
+          "type": "string",
+          "default": "",
+          "description": "%config.gitlab.defaultProjectId%"
+        },
         "jiraGitlabHelper.gitlab.defaultTargetBranch": {
           "type": "string",
           "default": "main",
