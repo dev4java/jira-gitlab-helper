@@ -112,6 +112,7 @@ export class ConfigurationPanel {
         gitlab: {
           serverUrl: config.get<string>('gitlab.serverUrl', ''),
           token: gitlabToken || '',
+          defaultProjectId: config.get<string>('gitlab.defaultProjectId', ''),
           defaultTargetBranch: config.get<string>(
             'gitlab.defaultTargetBranch',
             'main'
@@ -183,6 +184,11 @@ export class ConfigurationPanel {
       await config.update(
         'gitlab.serverUrl',
         data.serverUrl,
+        vscode.ConfigurationTarget.Global
+      );
+      await config.update(
+        'gitlab.defaultProjectId',
+        data.defaultProjectId || '',
         vscode.ConfigurationTarget.Global
       );
       await config.update(
@@ -973,6 +979,7 @@ export class ConfigurationPanel {
             const data = {
                 serverUrl: document.getElementById('gitlab-url').value.trim(),
                 token: document.getElementById('gitlab-token').value.trim(),
+                defaultProjectId: document.getElementById('gitlab-project').value.trim(),
                 defaultTargetBranch: document.getElementById('gitlab-branch').value.trim(),
             };
             

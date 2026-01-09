@@ -79,11 +79,10 @@ export class AnalyzeRequirementCommand {
               '是否现在安装OpenSpec？',
               { modal: true },
               '安装OpenSpec',
-              '跳过（仅AI分析）',
-              '取消'
+              '跳过（仅AI分析）'
             );
 
-            if (installChoice === '取消' || !installChoice) {
+            if (!installChoice) {
               void vscode.window.showInformationMessage('已取消需求分析');
               return;
             } else if (installChoice === '安装OpenSpec') {
@@ -209,7 +208,7 @@ export class AnalyzeRequirementCommand {
             return;
           }
 
-          // If OpenSpec is not installed, provide basic analysis results and options
+          // If OpenSpec is not installed, save analysis to markdown and show to user
           if (!isOpenSpecInstalled) {
             this._logger.info('Requirement analysis completed without OpenSpec', {
               issueKey: issue!.key,
@@ -217,47 +216,58 @@ export class AnalyzeRequirementCommand {
               complexity: analysis.estimatedComplexity,
             });
             
-            const nextAction = await vscode.window.showInformationMessage(
-              `✅ 需求分析完成: ${issue!.key}\n\n` +
-              `建议功能: ${analysis.suggestedChangeId}\n` +
-              `复杂度: ${analysis.estimatedComplexity}\n\n` +
-              `💡 提示: 当前使用基础AI分析模式\n` +
-              `安装OpenSpec CLI可生成更完整的规格文档和任务列表。\n\n` +
-              `您可以继续进行代码生成，或查看详细分析结果。`,
-              { modal: true },
-              '开始生成代码',
-              '查看详细分析',
-              '安装OpenSpec',
-              '关闭'
-            );
+            // Generate markdown content
+            const analysisText = this.formatAnalysisForDisplay(issue!, analysis);
             
-            if (nextAction === '开始生成代码') {
-              // 直接使用分析结果生成代码（不需要完整的OpenSpec提案）
-              await vscode.commands.executeCommand('jiraGitlabHelper.generateCode', issue, analysis);
-            } else if (nextAction === '查看详细分析') {
-              // 在输出通道显示详细分析
-              const analysisText = this.formatAnalysisForDisplay(issue!, analysis);
+            // Create markdown file in workspace
+            const workspaceUri = this.getWorkspaceUri();
+            if (workspaceUri) {
+              try {
+                const analysisFileName = `${issue!.key}-需求分析.md`;
+                const analysisFilePath = vscode.Uri.joinPath(workspaceUri, analysisFileName);
+                
+                // Write to file
+                const encoder = new TextEncoder();
+                await vscode.workspace.fs.writeFile(analysisFilePath, encoder.encode(analysisText));
+                
+                // Open the file
+                const doc = await vscode.workspace.openTextDocument(analysisFilePath);
+                await vscode.window.showTextDocument(doc, { preview: false });
+                
+                this._logger.info('Analysis saved to file', { path: analysisFilePath.fsPath });
+              } catch (error) {
+                this._logger.error('Failed to save analysis file', error);
+                // Fallback: open in untitled document
+                const doc = await vscode.workspace.openTextDocument({
+                  content: analysisText,
+                  language: 'markdown',
+                });
+                await vscode.window.showTextDocument(doc, { preview: false });
+              }
+            } else {
+              // No workspace, open in untitled document
               const doc = await vscode.workspace.openTextDocument({
                 content: analysisText,
                 language: 'markdown',
               });
-              await vscode.window.showTextDocument(doc, { preview: true });
-            } else if (nextAction === '安装OpenSpec') {
-              // 引导用户安装OpenSpec并重新运行
-              await vscode.window.showInformationMessage(
-                '请按以下步骤安装OpenSpec:\n\n' +
-                '1. 在终端运行: npm install -g openspec\n' +
-                '2. 等待安装完成\n' +
-                '3. 重新加载窗口或重启Cursor\n' +
-                '4. 重新运行"分析需求"命令',
-                '打开终端'
-              ).then((action) => {
-                if (action === '打开终端') {
-                  const terminal = vscode.window.createTerminal('OpenSpec 安装');
-                  terminal.show();
-                  terminal.sendText('npm install -g openspec');
-                }
-              });
+              await vscode.window.showTextDocument(doc, { preview: false });
+            }
+            
+            // Show confirmation dialog
+            const nextAction = await vscode.window.showInformationMessage(
+              `✅ 需求分析完成: ${issue!.key}\n\n` +
+              `建议功能: ${analysis.suggestedChangeId}\n` +
+              `复杂度: ${analysis.estimatedComplexity}\n\n` +
+              `分析结果已保存为Markdown文档并已打开。\n` +
+              `您可以查看分析内容后继续进行代码生成。`,
+              { modal: true },
+              '继续生成代码',
+              '关闭'
+            );
+            
+            if (nextAction === '继续生成代码') {
+              // Use analysis results to generate code
+              await vscode.commands.executeCommand('jiraGitlabHelper.generateCode', issue, analysis);
             }
             
             return;
