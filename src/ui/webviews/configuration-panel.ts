@@ -153,6 +153,16 @@ export class ConfigurationPanel {
 
   private async _saveJiraConfig(data: any): Promise<void> {
     try {
+      // 验证必填字段
+      if (!data.serverUrl || !data.username) {
+        throw new Error('请填写服务器地址和用户名');
+      }
+
+      // 检查是否有密码（新密码或保留旧密码）
+      if (!data.password && !data.keepOldPassword) {
+        throw new Error('请填写密码/API Token');
+      }
+
       const config = vscode.workspace.getConfiguration('jiraGitlabHelper');
 
       await config.update(
@@ -178,14 +188,10 @@ export class ConfigurationPanel {
           serverUrl: data.serverUrl,
           username: data.username,
           authType: data.authType,
+          passwordLength: data.password.length,
         });
       } else if (data.keepOldPassword) {
         this._logger.info('Keeping old Jira credential', {
-          serverUrl: data.serverUrl,
-          username: data.username,
-        });
-      } else {
-        this._logger.warn('Jira password is empty and no keepOldPassword flag', {
           serverUrl: data.serverUrl,
           username: data.username,
         });
@@ -194,7 +200,7 @@ export class ConfigurationPanel {
       this._panel.webview.postMessage({
         command: 'saveSuccess',
         section: 'jira',
-        message: 'Jira配置已保存',
+        message: 'JIRA配置已保存，建议点击"测试连接"验证配置是否正确',
       });
 
       this._logger.info('Jira configuration saved');
@@ -203,7 +209,7 @@ export class ConfigurationPanel {
       this._panel.webview.postMessage({
         command: 'saveError',
         section: 'jira',
-        message: '保存Jira配置失败: ' + (error as Error).message,
+        message: '保存JIRA配置失败: ' + (error as Error).message,
       });
     }
   }
@@ -319,25 +325,48 @@ export class ConfigurationPanel {
         section: 'jira',
       });
 
-      // 这里可以实际测试连接
-      // 简化版本：只验证字段是否填写
+      // 验证必填字段
       if (!data.serverUrl || !data.username || !data.password) {
-        throw new Error('请填写完整的Jira配置信息');
+        throw new Error('请填写完整的Jira配置信息（服务器地址、用户名、密码/API Token）');
       }
 
-      // TODO: 实际调用 JiraClient 测试连接
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      this._panel.webview.postMessage({
-        command: 'testSuccess',
-        section: 'jira',
-        message: 'Jira连接测试成功',
+      this._logger.info('Testing JIRA connection', {
+        serverUrl: data.serverUrl,
+        username: data.username,
+        authType: data.authType,
+        hasPassword: !!data.password,
+        passwordLength: data.password ? data.password.length : 0,
       });
+
+      // 实际测试连接
+      const { JiraClient } = await import('../../integrations/jira-client');
+      const testClient = new JiraClient(
+        {
+          serverUrl: data.serverUrl,
+          username: data.username,
+          credential: data.password,
+          authType: data.authType || 'apiToken',
+        },
+        this._logger
+      );
+
+      const success = await testClient.testConnection();
+      
+      if (success) {
+        this._panel.webview.postMessage({
+          command: 'testSuccess',
+          section: 'jira',
+          message: 'JIRA连接测试成功！认证信息有效',
+        });
+      } else {
+        throw new Error('连接测试失败');
+      }
     } catch (error) {
+      this._logger.error('JIRA connection test failed', error);
       this._panel.webview.postMessage({
         command: 'testError',
         section: 'jira',
-        message: 'Jira连接测试失败: ' + (error as Error).message,
+        message: 'JIRA连接测试失败: ' + (error as Error).message,
       });
     }
   }
@@ -377,19 +406,40 @@ export class ConfigurationPanel {
         section: 'gitlab',
       });
 
+      // 验证必填字段
       if (!data.serverUrl || !data.token) {
-        throw new Error('请填写完整的GitLab配置信息');
+        throw new Error('请填写完整的GitLab配置信息（服务器地址、Access Token）');
       }
 
-      // TODO: 实际调用 GitlabClient 测试连接
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      this._panel.webview.postMessage({
-        command: 'testSuccess',
-        section: 'gitlab',
-        message: 'GitLab连接测试成功',
+      this._logger.info('Testing GitLab connection', {
+        serverUrl: data.serverUrl,
+        hasToken: !!data.token,
+        tokenLength: data.token ? data.token.length : 0,
       });
+
+      // 实际测试连接
+      const { GitlabClient } = await import('../../integrations/gitlab-client');
+      const testClient = new GitlabClient(
+        {
+          serverUrl: data.serverUrl,
+          token: data.token,
+        },
+        this._logger
+      );
+
+      const success = await testClient.testConnection();
+      
+      if (success) {
+        this._panel.webview.postMessage({
+          command: 'testSuccess',
+          section: 'gitlab',
+          message: 'GitLab连接测试成功！Token有效',
+        });
+      } else {
+        throw new Error('连接测试失败');
+      }
     } catch (error) {
+      this._logger.error('GitLab connection test failed', error);
       this._panel.webview.postMessage({
         command: 'testError',
         section: 'gitlab',
@@ -1078,11 +1128,25 @@ export class ConfigurationPanel {
         }
         
         function testJira() {
+            const passwordField = document.getElementById('jira-password');
+            const password = passwordField.value.trim();
+            
+            if (!password) {
+                showMessage('jira', 'error', '请输入密码/API Token以测试连接');
+                return;
+            }
+            
             const data = {
                 serverUrl: document.getElementById('jira-url').value.trim(),
                 username: document.getElementById('jira-username').value.trim(),
-                password: document.getElementById('jira-password').value.trim(),
+                authType: document.getElementById('jira-auth-type').value,
+                password: password,
             };
+            
+            if (!data.serverUrl || !data.username) {
+                showMessage('jira', 'error', '请填写服务器地址和用户名');
+                return;
+            }
             
             vscode.postMessage({ command: 'testJira', data });
         }
@@ -1105,10 +1169,23 @@ export class ConfigurationPanel {
         }
         
         function testGitlab() {
+            const tokenField = document.getElementById('gitlab-token');
+            const token = tokenField.value.trim();
+            
+            if (!token) {
+                showMessage('gitlab', 'error', '请输入Access Token以测试连接');
+                return;
+            }
+            
             const data = {
                 serverUrl: document.getElementById('gitlab-url').value.trim(),
-                token: document.getElementById('gitlab-token').value.trim(),
+                token: token,
             };
+            
+            if (!data.serverUrl) {
+                showMessage('gitlab', 'error', '请填写服务器地址');
+                return;
+            }
             
             vscode.postMessage({ command: 'testGitlab', data });
         }
