@@ -171,8 +171,24 @@ export class ConfigurationPanel {
         vscode.ConfigurationTarget.Global
       );
 
+      // 只在有新密码时才保存，如果keepOldPassword为true则跳过
       if (data.password) {
         await this._configManager.setJiraCredential(data.password);
+        this._logger.info('Jira credential saved', {
+          serverUrl: data.serverUrl,
+          username: data.username,
+          authType: data.authType,
+        });
+      } else if (data.keepOldPassword) {
+        this._logger.info('Keeping old Jira credential', {
+          serverUrl: data.serverUrl,
+          username: data.username,
+        });
+      } else {
+        this._logger.warn('Jira password is empty and no keepOldPassword flag', {
+          serverUrl: data.serverUrl,
+          username: data.username,
+        });
       }
 
       this._panel.webview.postMessage({
@@ -212,8 +228,14 @@ export class ConfigurationPanel {
         vscode.ConfigurationTarget.Global
       );
 
+      // 只在有新token时才保存，如果keepOldToken为true则跳过
       if (data.token) {
         await this._configManager.setGitlabToken(data.token);
+        this._logger.info('GitLab token saved');
+      } else if (data.keepOldToken) {
+        this._logger.info('Keeping old GitLab token');
+      } else {
+        this._logger.warn('GitLab token is empty and no keepOldToken flag');
       }
 
       this._panel.webview.postMessage({
@@ -948,12 +970,25 @@ export class ConfigurationPanel {
             document.getElementById('jira-url').value = config.jira.serverUrl || '';
             document.getElementById('jira-username').value = config.jira.username || '';
             document.getElementById('jira-auth-type').value = config.jira.authType || 'apiToken';
-            document.getElementById('jira-password').value = config.jira.password || '';
-            updateStatus('jira', config.jira.serverUrl && config.jira.username);
+            // 保存已有密码状态，用于后续判断是否需要保留旧密码
+            const jiraPasswordField = document.getElementById('jira-password');
+            jiraPasswordField.value = config.jira.password || '';
+            jiraPasswordField.setAttribute('data-has-saved', config.jira.password ? 'true' : 'false');
+            if (config.jira.password) {
+                jiraPasswordField.placeholder = '(已保存) 留空则保持不变';
+                jiraPasswordField.value = ''; // 不显示明文密码
+            }
+            updateStatus('jira', config.jira.serverUrl && config.jira.username && config.jira.password);
             
             // GitLab
             document.getElementById('gitlab-url').value = config.gitlab.serverUrl || '';
-            document.getElementById('gitlab-token').value = config.gitlab.token || '';
+            const gitlabTokenField = document.getElementById('gitlab-token');
+            gitlabTokenField.value = config.gitlab.token || '';
+            gitlabTokenField.setAttribute('data-has-saved', config.gitlab.token ? 'true' : 'false');
+            if (config.gitlab.token) {
+                gitlabTokenField.placeholder = '(已保存) 留空则保持不变';
+                gitlabTokenField.value = ''; // 不显示明文token
+            }
             document.getElementById('gitlab-project').value = config.gitlab.defaultProjectId || '';
             document.getElementById('gitlab-branch').value = config.gitlab.defaultTargetBranch || 'main';
             updateStatus('gitlab', config.gitlab.serverUrl && config.gitlab.token);
@@ -964,8 +999,14 @@ export class ConfigurationPanel {
                 document.getElementById('confluence-url').value = config.confluence.serverUrl || '';
                 document.getElementById('confluence-username').value = config.confluence.username || '';
                 document.getElementById('confluence-auth-type').value = config.confluence.authType || 'apiToken';
-                document.getElementById('confluence-password').value = config.confluence.password || '';
-                updateStatus('confluence', config.confluence.enabled && config.confluence.serverUrl);
+                const confluencePasswordField = document.getElementById('confluence-password');
+                confluencePasswordField.value = config.confluence.password || '';
+                confluencePasswordField.setAttribute('data-has-saved', config.confluence.password ? 'true' : 'false');
+                if (config.confluence.password) {
+                    confluencePasswordField.placeholder = '(已保存) 留空则保持不变';
+                    confluencePasswordField.value = ''; // 不显示明文密码
+                }
+                updateStatus('confluence', config.confluence.enabled && config.confluence.serverUrl && config.confluence.password);
                 toggleConfluenceFields();
             }
         }
@@ -985,15 +1026,25 @@ export class ConfigurationPanel {
         });
         
         function saveJira() {
+            const passwordField = document.getElementById('jira-password');
+            const hasSavedPassword = passwordField.getAttribute('data-has-saved') === 'true';
+            const newPassword = passwordField.value.trim();
+            
             const data = {
                 serverUrl: document.getElementById('jira-url').value.trim(),
                 username: document.getElementById('jira-username').value.trim(),
                 authType: document.getElementById('jira-auth-type').value,
-                password: document.getElementById('jira-password').value.trim(),
+                password: newPassword,
+                keepOldPassword: !newPassword && hasSavedPassword, // 如果留空且之前有密码，保留旧密码
             };
             
-            if (!data.serverUrl || !data.username || !data.password) {
-                showMessage('jira', 'error', t('errorFillAll'));
+            if (!data.serverUrl || !data.username) {
+                showMessage('jira', 'error', '请填写服务器地址和用户名');
+                return;
+            }
+            
+            if (!data.password && !hasSavedPassword) {
+                showMessage('jira', 'error', '请填写密码/API Token');
                 return;
             }
             
@@ -1001,15 +1052,25 @@ export class ConfigurationPanel {
         }
         
         function saveGitlab() {
+            const tokenField = document.getElementById('gitlab-token');
+            const hasSavedToken = tokenField.getAttribute('data-has-saved') === 'true';
+            const newToken = tokenField.value.trim();
+            
             const data = {
                 serverUrl: document.getElementById('gitlab-url').value.trim(),
-                token: document.getElementById('gitlab-token').value.trim(),
+                token: newToken,
                 defaultProjectId: document.getElementById('gitlab-project').value.trim(),
                 defaultTargetBranch: document.getElementById('gitlab-branch').value.trim(),
+                keepOldToken: !newToken && hasSavedToken, // 如果留空且之前有token，保留旧token
             };
             
-            if (!data.serverUrl || !data.token) {
-                showMessage('gitlab', 'error', t('errorFillAll'));
+            if (!data.serverUrl) {
+                showMessage('gitlab', 'error', '请填写服务器地址');
+                return;
+            }
+            
+            if (!data.token && !hasSavedToken) {
+                showMessage('gitlab', 'error', '请填写Access Token');
                 return;
             }
             

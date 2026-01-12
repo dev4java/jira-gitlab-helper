@@ -28,6 +28,14 @@ export class JiraService {
       const config = this._configManager.getJiraConfig();
       const credential = await this._configManager.getJiraCredential();
 
+      this._logger.info('Initializing JIRA client', {
+        serverUrl: config.serverUrl ? '***' : '(empty)',
+        username: config.username ? '***' : '(empty)',
+        authType: config.authType,
+        hasCredential: !!credential,
+        credentialLength: credential ? credential.length : 0,
+      });
+
       if (!config.serverUrl || !config.username || !credential) {
         throw new Error('JIRA配置不完整,请先配置JIRA连接');
       }
