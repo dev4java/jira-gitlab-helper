@@ -67,13 +67,13 @@ export class JiraService {
 
   public async searchMyIssues(): Promise<IJiraSearchResult> {
     const config = this._configManager.getJiraConfig();
-    // 查询所有状态的问题（包括已关闭的），按更新时间倒序
-    const jql = `assignee = "${config.username}" ORDER BY updated DESC`;
+    // 查询2年内更新过的问题（730天），最多返回500条
+    const jql = `assignee = "${config.username}" AND updated >= -730d ORDER BY updated DESC`;
 
     this._logger.info(`Searching issues with JQL: ${jql}`);
     
     const client = await this.getClient();
-    const result = await client.searchIssues(jql, 0, 100);
+    const result = await client.searchIssues(jql, 0, 500);
     
     this._logger.info(`Found ${result.total} total issues, returned ${result.issues.length} issues`);
     this._logger.info(`Issue keys: ${result.issues.map(i => i.key).join(', ')}`);
