@@ -10,6 +10,7 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private _issues: IJiraIssue[] = [];
+  private _groupedIssues: Map<string, IJiraIssue[]> = new Map();
 
   constructor(
     private readonly _jiraService: JiraService,
@@ -26,7 +27,7 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
 
   async getChildren(element?: JiraIssueTreeItem): Promise<JiraIssueTreeItem[]> {
     if (!element) {
-      // Root level - show issues
+      // Root level - show groups
       try {
         const result = await this._jiraService.searchMyIssues();
         this._issues = result.issues;
@@ -37,7 +38,37 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
           ];
         }
 
-        return this._issues.map((issue) => this.createTreeItem(issue));
+        // Group issues
+        this._groupedIssues = this.groupIssues(this._issues);
+
+        // Create group items
+        const groups: JiraIssueTreeItem[] = [];
+        
+        if (this._groupedIssues.has('pending')) {
+          const pendingCount = this._groupedIssues.get('pending')!.length;
+          const pendingItem = new JiraIssueTreeItem(
+            `未处理 (${pendingCount})`,
+            'group-pending',
+            vscode.TreeItemCollapsibleState.Expanded
+          );
+          pendingItem.contextValue = 'issue-group';
+          pendingItem.iconPath = new vscode.ThemeIcon('folder-opened');
+          groups.push(pendingItem);
+        }
+
+        if (this._groupedIssues.has('closed')) {
+          const closedCount = this._groupedIssues.get('closed')!.length;
+          const closedItem = new JiraIssueTreeItem(
+            `已关闭 (${closedCount})`,
+            'group-closed',
+            vscode.TreeItemCollapsibleState.Collapsed
+          );
+          closedItem.contextValue = 'issue-group';
+          closedItem.iconPath = new vscode.ThemeIcon('folder');
+          groups.push(closedItem);
+        }
+
+        return groups;
       } catch (error) {
         this._logger.error('Failed to load JIRA issues', error);
         return [
@@ -48,9 +79,71 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
           ),
         ];
       }
+    } else if (element.issueKey.startsWith('group-')) {
+      // Show issues in group
+      const groupKey = element.issueKey.replace('group-', '');
+      const issues = this._groupedIssues.get(groupKey) || [];
+      return issues.map((issue) => this.createTreeItem(issue));
     }
 
     return [];
+  }
+
+  /**
+   * 分组问题：未处理 / 已关闭
+   */
+  private groupIssues(issues: IJiraIssue[]): Map<string, IJiraIssue[]> {
+    const groups = new Map<string, IJiraIssue[]>();
+    const pending: IJiraIssue[] = [];
+    const closed: IJiraIssue[] = [];
+
+    for (const issue of issues) {
+      if (this.isClosed(issue.status)) {
+        closed.push(issue);
+      } else {
+        pending.push(issue);
+      }
+    }
+
+    // 未处理：按提测日期倒序（最近的在前）
+    pending.sort((a, b) => {
+      const aHasDate = !!a.plannedTestDate;
+      const bHasDate = !!b.plannedTestDate;
+
+      if (aHasDate && bHasDate) {
+        // 都有提测日期，按日期倒序（日期晚的在前）
+        return new Date(b.plannedTestDate!).getTime() - new Date(a.plannedTestDate!).getTime();
+      }
+
+      if (aHasDate && !bHasDate) {
+        return -1; // 有日期的在前
+      }
+
+      if (!aHasDate && bHasDate) {
+        return 1;
+      }
+
+      // 都没有日期，按更新时间倒序
+      return new Date(b.updated).getTime() - new Date(a.updated).getTime();
+    });
+
+    // 已关闭：按修改时间倒序
+    closed.sort((a, b) => {
+      return new Date(b.updated).getTime() - new Date(a.updated).getTime();
+    });
+
+    groups.set('pending', pending);
+    groups.set('closed', closed);
+
+    return groups;
+  }
+
+  /**
+   * 判断状态是否为已关闭
+   */
+  private isClosed(status: string): boolean {
+    const closedStatuses = ['closed', '已关闭', 'done', '完成'];
+    return closedStatuses.some(s => status.toLowerCase().includes(s.toLowerCase()));
   }
 
   private createTreeItem(issue: IJiraIssue): JiraIssueTreeItem {
@@ -60,10 +153,23 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
       vscode.TreeItemCollapsibleState.None
     );
 
-    item.description = `${issue.type} - ${issue.status}`;
+    // 描述信息，包含提测日期（如果有）
+    let description = `${issue.type} - ${issue.status}`;
+    if (issue.plannedTestDate && !this.isClosed(issue.status)) {
+      const dateStr = this.formatDate(issue.plannedTestDate);
+      description += ` 📅 ${dateStr}`;
+    }
+    item.description = description;
+
     item.tooltip = this.createTooltip(issue);
     item.iconPath = this.getIconForIssueType(issue.type);
     item.contextValue = this.getContextValue(issue);
+
+    // 根据提测日期状态设置颜色
+    if (issue.plannedTestDate && !this.isClosed(issue.status)) {
+      const colorStatus = this.getTestDateColorStatus(issue.plannedTestDate);
+      item.iconPath = this.getColoredIcon(issue.type, colorStatus);
+    }
 
     item.command = {
       command: 'jiraGitlabHelper.showIssueDetails',
@@ -72,6 +178,67 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
     };
 
     return item;
+  }
+
+  /**
+   * 获取提测日期的颜色状态
+   * @returns 'expired' | 'warning' | 'safe'
+   */
+  private getTestDateColorStatus(plannedTestDate: string): 'expired' | 'warning' | 'safe' {
+    const now = new Date();
+    const testDate = new Date(plannedTestDate);
+    const diffInDays = Math.ceil((testDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffInDays < 0) {
+      return 'expired'; // 已过期 - 红色
+    } else if (diffInDays < 3) {
+      return 'warning'; // 小于3天 - 黄色
+    } else {
+      return 'safe'; // 3天及以上 - 绿色
+    }
+  }
+
+  /**
+   * 根据类型和颜色状态获取带颜色的图标
+   */
+  private getColoredIcon(type: string, colorStatus: 'expired' | 'warning' | 'safe'): vscode.ThemeIcon {
+    let iconName: string;
+    
+    switch (type.toLowerCase()) {
+      case 'story':
+        iconName = 'book';
+        break;
+      case 'task':
+        iconName = 'checklist';
+        break;
+      case 'bug':
+        iconName = 'bug';
+        break;
+      case 'epic':
+        iconName = 'milestone';
+        break;
+      case 'sub-task':
+        iconName = 'note';
+        break;
+      default:
+        iconName = 'circle-outline';
+    }
+
+    // 根据状态设置颜色
+    let color: vscode.ThemeColor;
+    switch (colorStatus) {
+      case 'expired':
+        color = new vscode.ThemeColor('errorForeground'); // 红色
+        break;
+      case 'warning':
+        color = new vscode.ThemeColor('editorWarning.foreground'); // 黄色
+        break;
+      case 'safe':
+        color = new vscode.ThemeColor('terminal.ansiGreen'); // 绿色
+        break;
+    }
+
+    return new vscode.ThemeIcon(iconName, color);
   }
 
   private createTooltip(issue: IJiraIssue): string {
