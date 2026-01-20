@@ -67,6 +67,22 @@ export class JiraService {
 
   public async searchMyIssues(): Promise<IJiraSearchResult> {
     const config = this._configManager.getJiraConfig();
+    
+    // 先查询IOP-6255看是否能找到
+    try {
+      const testIssue = await this.getIssue('IOP-6255');
+      this._logger.info(`🔍 调试信息 - IOP-6255 详情:`);
+      this._logger.info(`  - Key: ${testIssue.key}`);
+      this._logger.info(`  - Status: ${testIssue.status}`);
+      this._logger.info(`  - Assignee: ${testIssue.assignee}`);
+      this._logger.info(`  - Reporter: ${testIssue.reporter}`);
+      this._logger.info(`  - Updated: ${testIssue.updated}`);
+      this._logger.info(`  - Created: ${testIssue.created}`);
+      this._logger.info(`  - Current User: ${config.username}`);
+    } catch (error) {
+      this._logger.warn(`无法获取IOP-6255: ${error}`);
+    }
+    
     // 查询2年内更新过的问题（730天），最多返回500条
     const jql = `assignee = "${config.username}" AND updated >= -730d ORDER BY updated DESC`;
 
