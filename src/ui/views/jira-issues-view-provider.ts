@@ -72,11 +72,15 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
     }
 
     const keyword = this._searchKeyword.toLowerCase();
-    return issues.filter(issue => {
+    const filtered = issues.filter(issue => {
       return issue.key.toLowerCase().includes(keyword) ||
              issue.summary.toLowerCase().includes(keyword) ||
              (issue.description && issue.description.toLowerCase().includes(keyword));
     });
+    
+    this._logger.info(`Filtered ${issues.length} -> ${filtered.length} issues with keyword: "${this._searchKeyword}"`);
+    
+    return filtered;
   }
 
   getTreeItem(element: JiraIssueTreeItem): vscode.TreeItem {
@@ -89,6 +93,14 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
       try {
         const result = await this._jiraService.searchMyIssues();
         this._issues = result.issues;
+
+        this._logger.info(`Total issues fetched: ${this._issues.length} (total in Jira: ${result.total})`);
+        this._logger.info(`Issue keys: ${this._issues.map(i => i.key).join(', ')}`);
+        
+        // 警告：如果Jira中的问题总数超过返回的数量
+        if (result.total > this._issues.length) {
+          this._logger.warn(`⚠️ Jira中有 ${result.total} 个问题，但只返回了 ${this._issues.length} 个。某些问题可能未显示。`);
+        }
 
         // 应用搜索过滤
         const filteredIssues = this.filterIssuesByKeyword(this._issues);
