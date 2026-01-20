@@ -96,6 +96,24 @@
         "command": "jiraGitlabHelper.handleCRSuggestions",
         "title": "%command.handleCRSuggestions%",
         "category": "Jira GitLab Helper"
+      },
+      {
+        "command": "jiraGitlabHelper.searchIssues",
+        "title": "%command.searchIssues%",
+        "category": "Jira GitLab Helper",
+        "icon": "$(search)"
+      },
+      {
+        "command": "jiraGitlabHelper.clearSearchIssues",
+        "title": "%command.clearSearchIssues%",
+        "category": "Jira GitLab Helper",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "jiraGitlabHelper.refreshIssues",
+        "title": "%command.refreshIssues%",
+        "category": "Jira GitLab Helper",
+        "icon": "$(refresh)"
       }
     ],
     "viewsContainers": {
@@ -116,6 +134,25 @@
         {
           "id": "jiraGitlabHelperTasks",
           "name": "%view.tasks%"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "jiraGitlabHelper.searchIssues",
+          "when": "view == jiraGitlabHelperJiraIssues",
+          "group": "navigation@1"
+        },
+        {
+          "command": "jiraGitlabHelper.clearSearchIssues",
+          "when": "view == jiraGitlabHelperJiraIssues",
+          "group": "navigation@2"
+        },
+        {
+          "command": "jiraGitlabHelper.refreshIssues",
+          "when": "view == jiraGitlabHelperJiraIssues",
+          "group": "navigation@3"
         }
       ]
     },

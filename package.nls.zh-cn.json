@@ -12,6 +12,9 @@
   "command.commitCode": "提交代码",
   "command.createMR": "创建Merge Request",
   "command.handleCRSuggestions": "处理Code Review建议",
+  "command.searchIssues": "搜索问题",
+  "command.clearSearchIssues": "清除搜索",
+  "command.refreshIssues": "刷新列表",
   
   "view.jiraIssues": "问题列表",
   "view.tasks": "任务进度",

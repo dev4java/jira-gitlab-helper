@@ -268,6 +268,27 @@ function registerCommands(
     })
   );
 
+  // Search Jira Issues
+  context.subscriptions.push(
+    vscode.commands.registerCommand('jiraGitlabHelper.searchIssues', async () => {
+      await jiraIssuesViewProvider.search();
+    })
+  );
+
+  // Clear Jira Issues Search
+  context.subscriptions.push(
+    vscode.commands.registerCommand('jiraGitlabHelper.clearSearchIssues', async () => {
+      jiraIssuesViewProvider.clearSearch();
+    })
+  );
+
+  // Refresh Jira Issues
+  context.subscriptions.push(
+    vscode.commands.registerCommand('jiraGitlabHelper.refreshIssues', () => {
+      jiraIssuesViewProvider.refresh();
+    })
+  );
+
   logger.info('All commands registered');
 }
 

@@ -11,6 +11,7 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
 
   private _issues: IJiraIssue[] = [];
   private _groupedIssues: Map<string, IJiraIssue[]> = new Map();
+  private _searchKeyword: string = '';
   
   // 状态分类常量（使用精确匹配，避免误判）
   private readonly PENDING_STATUSES = [
@@ -36,6 +37,48 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
     this._onDidChangeTreeData.fire();
   }
 
+  /**
+   * 搜索问题
+   */
+  async search(): Promise<void> {
+    const keyword = await vscode.window.showInputBox({
+      prompt: '输入关键词搜索问题标题或内容',
+      placeHolder: '例如: IOP-1234 或 登录问题',
+      value: this._searchKeyword
+    });
+
+    if (keyword !== undefined) {
+      this._searchKeyword = keyword.trim();
+      this._logger.info(`搜索关键词: "${this._searchKeyword}"`);
+      this.refresh();
+    }
+  }
+
+  /**
+   * 清除搜索
+   */
+  clearSearch(): void {
+    this._searchKeyword = '';
+    this._logger.info('清除搜索');
+    this.refresh();
+  }
+
+  /**
+   * 根据关键词过滤问题
+   */
+  private filterIssuesByKeyword(issues: IJiraIssue[]): IJiraIssue[] {
+    if (!this._searchKeyword) {
+      return issues;
+    }
+
+    const keyword = this._searchKeyword.toLowerCase();
+    return issues.filter(issue => {
+      return issue.key.toLowerCase().includes(keyword) ||
+             issue.summary.toLowerCase().includes(keyword) ||
+             (issue.description && issue.description.toLowerCase().includes(keyword));
+    });
+  }
+
   getTreeItem(element: JiraIssueTreeItem): vscode.TreeItem {
     return element;
   }
@@ -47,22 +90,33 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
         const result = await this._jiraService.searchMyIssues();
         this._issues = result.issues;
 
-        if (this._issues.length === 0) {
+        // 应用搜索过滤
+        const filteredIssues = this.filterIssuesByKeyword(this._issues);
+
+        if (filteredIssues.length === 0) {
+          if (this._searchKeyword) {
+            return [
+              new JiraIssueTreeItem(`没有找到匹配 "${this._searchKeyword}" 的问题`, '', vscode.TreeItemCollapsibleState.None),
+            ];
+          }
           return [
             new JiraIssueTreeItem('没有分配给您的问题', '', vscode.TreeItemCollapsibleState.None),
           ];
         }
 
         // Group issues
-        this._groupedIssues = this.groupIssues(this._issues);
+        this._groupedIssues = this.groupIssues(filteredIssues);
 
         // Create group items
         const groups: JiraIssueTreeItem[] = [];
         
+        // 如果有搜索关键词，显示搜索提示
+        const searchSuffix = this._searchKeyword ? ` [搜索: ${this._searchKeyword}]` : '';
+        
         if (this._groupedIssues.has('pending')) {
           const pendingCount = this._groupedIssues.get('pending')!.length;
           const pendingItem = new JiraIssueTreeItem(
-            `未处理 (${pendingCount})`,
+            `未处理 (${pendingCount})${searchSuffix}`,
             'group-pending',
             vscode.TreeItemCollapsibleState.Expanded
           );
@@ -74,7 +128,7 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
         if (this._groupedIssues.has('testing')) {
           const testingCount = this._groupedIssues.get('testing')!.length;
           const testingItem = new JiraIssueTreeItem(
-            `测试中 (${testingCount})`,
+            `测试中 (${testingCount})${searchSuffix}`,
             'group-testing',
             vscode.TreeItemCollapsibleState.Expanded
           );
@@ -86,7 +140,7 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
         if (this._groupedIssues.has('closed')) {
           const closedCount = this._groupedIssues.get('closed')!.length;
           const closedItem = new JiraIssueTreeItem(
-            `已关闭 (${closedCount})`,
+            `已关闭 (${closedCount})${searchSuffix}`,
             'group-closed',
             vscode.TreeItemCollapsibleState.Collapsed
           );

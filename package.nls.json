@@ -12,6 +12,9 @@
   "command.commitCode": "Commit Code",
   "command.createMR": "Create Merge Request",
   "command.handleCRSuggestions": "Handle Code Review Suggestions",
+  "command.searchIssues": "Search Issues",
+  "command.clearSearchIssues": "Clear Search",
+  "command.refreshIssues": "Refresh Issues",
   
   "view.jiraIssues": "Jira Issues",
   "view.tasks": "Task Progress",
