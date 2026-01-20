@@ -11,6 +11,11 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
 
   private _issues: IJiraIssue[] = [];
   private _groupedIssues: Map<string, IJiraIssue[]> = new Map();
+  
+  // 状态分类常量
+  private readonly PENDING_STATUSES = ['open', '开放', 'design', '设计中', '设计', 'announcement', '公告', 'in progress', '进行中', 'reopened', '重新打开', '重开'];
+  private readonly TESTING_STATUSES = ['resolved', '已解决', 'testing', '测试中', '测试'];
+  // 已关闭状态：TESTED, CLOSE/CLOSED 等其他状态都归为已关闭
 
   constructor(
     private readonly _jiraService: JiraService,
@@ -52,8 +57,20 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
             vscode.TreeItemCollapsibleState.Expanded
           );
           pendingItem.contextValue = 'issue-group';
-          pendingItem.iconPath = new vscode.ThemeIcon('folder-opened');
+          pendingItem.iconPath = new vscode.ThemeIcon('circle-outline');
           groups.push(pendingItem);
+        }
+
+        if (this._groupedIssues.has('testing')) {
+          const testingCount = this._groupedIssues.get('testing')!.length;
+          const testingItem = new JiraIssueTreeItem(
+            `测试中 (${testingCount})`,
+            'group-testing',
+            vscode.TreeItemCollapsibleState.Expanded
+          );
+          testingItem.contextValue = 'issue-group';
+          testingItem.iconPath = new vscode.ThemeIcon('beaker');
+          groups.push(testingItem);
         }
 
         if (this._groupedIssues.has('closed')) {
@@ -64,7 +81,7 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
             vscode.TreeItemCollapsibleState.Collapsed
           );
           closedItem.contextValue = 'issue-group';
-          closedItem.iconPath = new vscode.ThemeIcon('folder');
+          closedItem.iconPath = new vscode.ThemeIcon('pass');
           groups.push(closedItem);
         }
 
@@ -90,29 +107,33 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
   }
 
   /**
-   * 分组问题：未处理 / 已关闭
+   * 分组问题：未处理 / 测试中 / 已关闭
    */
   private groupIssues(issues: IJiraIssue[]): Map<string, IJiraIssue[]> {
     const groups = new Map<string, IJiraIssue[]>();
     const pending: IJiraIssue[] = [];
+    const testing: IJiraIssue[] = [];
     const closed: IJiraIssue[] = [];
 
     for (const issue of issues) {
-      if (this.isClosed(issue.status)) {
-        closed.push(issue);
-      } else {
+      const group = this.getIssueGroup(issue.status);
+      if (group === 'pending') {
         pending.push(issue);
+      } else if (group === 'testing') {
+        testing.push(issue);
+      } else {
+        closed.push(issue);
       }
     }
 
-    // 未处理：按提测日期倒序（最近的在前）
+    // 未处理：按提测日期倒序（日期近的在前）
     pending.sort((a, b) => {
       const aHasDate = !!a.plannedTestDate;
       const bHasDate = !!b.plannedTestDate;
 
       if (aHasDate && bHasDate) {
-        // 都有提测日期，按日期倒序（日期晚的在前）
-        return new Date(b.plannedTestDate!).getTime() - new Date(a.plannedTestDate!).getTime();
+        // 都有提测日期，按日期正序（日期早的在前，即快要提测的在前）
+        return new Date(a.plannedTestDate!).getTime() - new Date(b.plannedTestDate!).getTime();
       }
 
       if (aHasDate && !bHasDate) {
@@ -127,23 +148,48 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
       return new Date(b.updated).getTime() - new Date(a.updated).getTime();
     });
 
+    // 测试中：按修改时间倒序
+    testing.sort((a, b) => {
+      return new Date(b.updated).getTime() - new Date(a.updated).getTime();
+    });
+
     // 已关闭：按修改时间倒序
     closed.sort((a, b) => {
       return new Date(b.updated).getTime() - new Date(a.updated).getTime();
     });
 
-    groups.set('pending', pending);
-    groups.set('closed', closed);
+    if (pending.length > 0) {
+      groups.set('pending', pending);
+    }
+    if (testing.length > 0) {
+      groups.set('testing', testing);
+    }
+    if (closed.length > 0) {
+      groups.set('closed', closed);
+    }
 
     return groups;
   }
 
   /**
-   * 判断状态是否为已关闭
+   * 判断问题属于哪个分组
+   * @returns 'pending' | 'testing' | 'closed'
    */
-  private isClosed(status: string): boolean {
-    const closedStatuses = ['closed', '已关闭', 'done', '完成'];
-    return closedStatuses.some(s => status.toLowerCase().includes(s.toLowerCase()));
+  private getIssueGroup(status: string): 'pending' | 'testing' | 'closed' {
+    const statusLower = status.toLowerCase();
+    
+    // 未处理
+    if (this.PENDING_STATUSES.some(s => statusLower === s || statusLower.includes(s))) {
+      return 'pending';
+    }
+    
+    // 测试中
+    if (this.TESTING_STATUSES.some(s => statusLower === s || statusLower.includes(s))) {
+      return 'testing';
+    }
+    
+    // 已关闭
+    return 'closed';
   }
 
   private createTreeItem(issue: IJiraIssue): JiraIssueTreeItem {
@@ -154,8 +200,9 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
     );
 
     // 描述信息，包含提测日期（如果有）
+    const group = this.getIssueGroup(issue.status);
     let description = `${issue.type} - ${issue.status}`;
-    if (issue.plannedTestDate && !this.isClosed(issue.status)) {
+    if (issue.plannedTestDate && group === 'pending') {
       const dateStr = this.formatDate(issue.plannedTestDate);
       description += ` 📅 ${dateStr}`;
     }
@@ -165,8 +212,13 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
     item.iconPath = this.getIconForIssueType(issue.type);
     item.contextValue = this.getContextValue(issue);
 
-    // 根据提测日期状态设置颜色
-    if (issue.plannedTestDate && !this.isClosed(issue.status)) {
+    // REOPENED 状态强制标记为黄色
+    const statusLower = issue.status.toLowerCase();
+    if (statusLower === 'reopened' || statusLower.includes('重新打开') || statusLower.includes('重开')) {
+      item.iconPath = this.getColoredIcon(issue.type, 'warning');
+    } 
+    // 根据提测日期状态设置颜色（仅未处理状态）
+    else if (issue.plannedTestDate && group === 'pending') {
       const colorStatus = this.getTestDateColorStatus(issue.plannedTestDate);
       item.iconPath = this.getColoredIcon(issue.type, colorStatus);
     }

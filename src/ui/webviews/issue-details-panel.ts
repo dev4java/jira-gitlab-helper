@@ -11,7 +11,8 @@ export class IssueDetailsPanel {
     panel: vscode.WebviewPanel,
     _extensionUri: vscode.Uri,
     private readonly _logger: Logger,
-    private _issue: IJiraIssue
+    private _issue: IJiraIssue,
+    private readonly _jiraServerUrl?: string
   ) {
     this._panel = panel;
 
@@ -37,6 +38,12 @@ export class IssueDetailsPanel {
             this._logger.info(`Starting bug analysis for ${this._issue.key}`);
             void vscode.commands.executeCommand('jiraGitlabHelper.analyzeBug', this._issue);
             break;
+          case 'openInBrowser':
+            if (this._jiraServerUrl) {
+              const issueUrl = `${this._jiraServerUrl}/browse/${this._issue.key}`;
+              void vscode.env.openExternal(vscode.Uri.parse(issueUrl));
+            }
+            break;
         }
       },
       null,
@@ -47,7 +54,8 @@ export class IssueDetailsPanel {
   public static createOrShow(
     extensionUri: vscode.Uri,
     logger: Logger,
-    issue: IJiraIssue
+    issue: IJiraIssue,
+    jiraServerUrl?: string
   ): void {
     const column = vscode.ViewColumn.Two;
 
@@ -76,7 +84,7 @@ export class IssueDetailsPanel {
       }
     );
 
-    IssueDetailsPanel.currentPanel = new IssueDetailsPanel(panel, extensionUri, logger, issue);
+    IssueDetailsPanel.currentPanel = new IssueDetailsPanel(panel, extensionUri, logger, issue, jiraServerUrl);
   }
 
   public dispose(): void {
@@ -124,32 +132,54 @@ export class IssueDetailsPanel {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${issue.key} - 详情</title>
     <style>
+        * {
+            box-sizing: border-box;
+        }
+        
         body {
-            font-family: var(--vscode-font-family);
-            font-size: var(--vscode-font-size);
-            color: var(--vscode-foreground);
-            background-color: var(--vscode-editor-background);
+            font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+            font-size: var(--vscode-font-size, 13px);
+            color: var(--vscode-foreground, #24292f);
+            background-color: var(--vscode-editor-background, #ffffff);
             padding: 20px;
             line-height: 1.6;
+            margin: 0;
         }
         
         .header {
-            border-bottom: 1px solid var(--vscode-panel-border);
+            border-bottom: 1px solid var(--vscode-panel-border, #e1e4e8);
             padding-bottom: 15px;
             margin-bottom: 20px;
         }
         
+        .issue-title {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
         .issue-key {
-            font-size: 1.2em;
+            font-size: 1.3em;
             font-weight: bold;
-            color: var(--vscode-textLink-foreground);
-            margin-bottom: 8px;
+            color: var(--vscode-textLink-foreground, #0969da);
+            cursor: pointer;
+            text-decoration: none;
+            transition: opacity 0.2s;
+        }
+        
+        .issue-key:hover {
+            opacity: 0.8;
+            text-decoration: underline;
+            color: var(--vscode-textLink-activeForeground, #0550ae);
         }
         
         .issue-summary {
-            font-size: 1.5em;
+            font-size: 1.3em;
             font-weight: 600;
-            margin-bottom: 10px;
+            flex: 1;
+            min-width: 200px;
         }
         
         .metadata {
@@ -161,34 +191,42 @@ export class IssueDetailsPanel {
         
         .metadata-label {
             font-weight: 600;
-            color: var(--vscode-descriptionForeground);
+            color: var(--vscode-descriptionForeground, #57606a);
         }
         
         .metadata-value {
-            color: var(--vscode-foreground);
+            color: var(--vscode-foreground, #24292f);
         }
         
         .badge {
             display: inline-block;
-            padding: 2px 8px;
-            border-radius: 3px;
-            font-size: 0.9em;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85em;
             font-weight: 500;
         }
         
         .badge-type {
-            background-color: var(--vscode-badge-background);
-            color: var(--vscode-badge-foreground);
+            background-color: var(--vscode-badge-background, #0969da);
+            color: var(--vscode-badge-foreground, #ffffff);
         }
         
         .badge-status {
-            background-color: var(--vscode-button-secondaryBackground);
-            color: var(--vscode-button-secondaryForeground);
+            background-color: var(--vscode-button-secondaryBackground, #f6f8fa);
+            color: var(--vscode-button-secondaryForeground, #24292f);
+            border: 1px solid var(--vscode-panel-border, #d0d7de);
+        }
+        
+        .badge-status-resolved {
+            background-color: var(--vscode-testing-iconPassed, #2da44e);
+            color: #ffffff;
+            border: none;
         }
         
         .badge-priority {
-            background-color: var(--vscode-inputValidation-warningBackground);
-            color: var(--vscode-inputValidation-warningForeground);
+            background-color: var(--vscode-inputValidation-warningBackground, #fff8c5);
+            color: var(--vscode-inputValidation-warningForeground, #4d2d00);
+            border: 1px solid var(--vscode-inputValidation-warningBorder, #d4a72c);
         }
         
         .section {
@@ -199,73 +237,90 @@ export class IssueDetailsPanel {
             font-size: 1.1em;
             font-weight: 600;
             margin-bottom: 10px;
-            color: var(--vscode-textLink-foreground);
+            color: var(--vscode-textLink-foreground, #0969da);
         }
         
         .description {
-            background-color: var(--vscode-textCodeBlock-background);
+            background-color: var(--vscode-textCodeBlock-background, #f6f8fa);
             padding: 15px;
-            border-radius: 4px;
+            border-radius: 6px;
             white-space: pre-wrap;
             word-wrap: break-word;
-            border: 1px solid var(--vscode-panel-border);
+            border: 1px solid var(--vscode-panel-border, #d0d7de);
+            color: var(--vscode-foreground, #24292f);
+            line-height: 1.6;
         }
         
         .actions {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             margin-top: 30px;
             padding-top: 20px;
-            border-top: 1px solid var(--vscode-panel-border);
+            border-top: 1px solid var(--vscode-panel-border, #e1e4e8);
         }
         
         .action-button {
             flex: 1;
-            padding: 12px 20px;
-            font-size: 1em;
+            padding: 10px 18px;
+            font-size: 0.95em;
             font-weight: 500;
             border: none;
-            border-radius: 4px;
+            border-radius: 6px;
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: all 0.2s ease;
         }
         
         .action-button:hover {
-            opacity: 0.8;
+            opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .action-button:active {
+            transform: translateY(0);
         }
         
         .btn-requirement {
-            background-color: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
+            background-color: var(--vscode-button-background, #0969da);
+            color: var(--vscode-button-foreground, #ffffff);
         }
         
         .btn-bug {
-            background-color: var(--vscode-button-secondaryBackground);
-            color: var(--vscode-button-secondaryForeground);
+            background-color: var(--vscode-button-secondaryBackground, #f6f8fa);
+            color: var(--vscode-button-secondaryForeground, #24292f);
+            border: 1px solid var(--vscode-panel-border, #d0d7de);
+        }
+        
+        .btn-bug:hover {
+            background-color: var(--vscode-list-hoverBackground, #f3f4f6);
         }
         
         .labels {
             display: flex;
             flex-wrap: wrap;
-            gap: 5px;
+            gap: 8px;
         }
         
         .label-tag {
-            background-color: var(--vscode-badge-background);
-            color: var(--vscode-badge-foreground);
-            padding: 2px 8px;
-            border-radius: 3px;
-            font-size: 0.85em;
+            background-color: var(--vscode-badge-background, #ddf4ff);
+            color: var(--vscode-badge-foreground, #0969da);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: 500;
+            border: 1px solid var(--vscode-panel-border, #54aeff);
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <div class="issue-key">${issue.key}</div>
-        <div class="issue-summary">${this._escapeHtml(issue.summary)}</div>
+        <div class="issue-title">
+            <a class="issue-key" href="#" onclick="openInBrowser(); return false;">${issue.key}</a>
+            <span class="issue-summary">${this._escapeHtml(issue.summary)}</span>
+        </div>
         <div style="margin-top: 10px;">
             <span class="badge badge-type">${this._escapeHtml(issue.type)}</span>
-            <span class="badge badge-status">${this._escapeHtml(issue.status)}</span>
+            <span class="badge ${this.isResolved(issue.status) ? 'badge-status-resolved' : 'badge-status'}">${this._escapeHtml(issue.status)}</span>
             <span class="badge badge-priority">${this._escapeHtml(issue.priority)}</span>
         </div>
     </div>
@@ -365,6 +420,12 @@ export class IssueDetailsPanel {
     <script>
         const vscode = acquireVsCodeApi();
         
+        function openInBrowser() {
+            vscode.postMessage({
+                command: 'openInBrowser'
+            });
+        }
+        
         function analyzeRequirement() {
             vscode.postMessage({
                 command: 'analyzeRequirement'
@@ -391,5 +452,10 @@ export class IssueDetailsPanel {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  private isResolved(status: string): boolean {
+    const resolvedStatuses = ['resolved', '已解决', 'closed', '已关闭', 'done', '完成'];
+    return resolvedStatuses.some(s => status.toLowerCase().includes(s.toLowerCase()));
   }
 }

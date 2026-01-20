@@ -221,7 +221,8 @@ function registerCommands(
   // Show Issue Details
   context.subscriptions.push(
     vscode.commands.registerCommand('jiraGitlabHelper.showIssueDetails', (issue) => {
-      IssueDetailsPanel.createOrShow(extensionUri, logger, issue);
+      const jiraConfig = configManager.getJiraConfig();
+      IssueDetailsPanel.createOrShow(extensionUri, logger, issue, jiraConfig.serverUrl);
     })
   );
 
