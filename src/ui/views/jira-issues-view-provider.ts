@@ -281,14 +281,46 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
   }
 
   private createTreeItem(issue: IJiraIssue): JiraIssueTreeItem {
+    // 判断颜色状态
+    const group = this.getIssueGroup(issue.status);
+    const statusLower = issue.status.toLowerCase().trim();
+    const isReopened = statusLower === 'reopened' || 
+                       statusLower === 'reopen' ||
+                       statusLower.includes('重新打开') || 
+                       statusLower.includes('重开');
+    
+    let colorStatus: 'expired' | 'warning' | 'safe' | null = null;
+    let colorPrefix = '';
+    
+    // 1. REOPENED 状态强制标记为黄色
+    if (isReopened) {
+      colorStatus = 'warning';
+      colorPrefix = '🟡 ';
+    } 
+    // 2. 根据提测日期状态设置颜色（仅未处理状态）
+    else if (issue.plannedTestDate && group === 'pending') {
+      colorStatus = this.getTestDateColorStatus(issue.plannedTestDate);
+      switch (colorStatus) {
+        case 'expired':
+          colorPrefix = '🔴 ';
+          break;
+        case 'warning':
+          colorPrefix = '🟡 ';
+          break;
+        case 'safe':
+          colorPrefix = '🟢 ';
+          break;
+      }
+    }
+    
+    // 创建带颜色前缀的标题
     const item = new JiraIssueTreeItem(
-      `${issue.key}: ${issue.summary}`,
+      `${colorPrefix}${issue.key}: ${issue.summary}`,
       issue.key,
       vscode.TreeItemCollapsibleState.None
     );
 
     // 描述信息，包含提测日期（如果有）
-    const group = this.getIssueGroup(issue.status);
     let description = `${issue.type} - ${issue.status}`;
     if (issue.plannedTestDate && group === 'pending') {
       const dateStr = this.formatDate(issue.plannedTestDate);
@@ -297,24 +329,15 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
     item.description = description;
 
     item.tooltip = this.createTooltip(issue);
-    item.iconPath = this.getIconForIssueType(issue.type);
-    item.contextValue = this.getContextValue(issue);
-
-    // REOPENED 状态强制标记为黄色
-    const statusLower = issue.status.toLowerCase().trim();
-    const isReopened = statusLower === 'reopened' || 
-                       statusLower === 'reopen' ||
-                       statusLower.includes('重新打开') || 
-                       statusLower.includes('重开');
     
-    if (isReopened) {
-      item.iconPath = this.getColoredIcon(issue.type, 'warning');
-    } 
-    // 根据提测日期状态设置颜色（仅未处理状态）
-    else if (issue.plannedTestDate && group === 'pending') {
-      const colorStatus = this.getTestDateColorStatus(issue.plannedTestDate);
+    // 设置图标颜色
+    if (colorStatus) {
       item.iconPath = this.getColoredIcon(issue.type, colorStatus);
+    } else {
+      item.iconPath = this.getIconForIssueType(issue.type);
     }
+    
+    item.contextValue = this.getContextValue(issue);
 
     item.command = {
       command: 'jiraGitlabHelper.showIssueDetails',
