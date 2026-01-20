@@ -15,9 +15,10 @@
   "command.searchIssues": "Search Issues",
   "command.clearSearchIssues": "Clear Search",
   "command.refreshIssues": "Refresh Issues",
+  "command.refreshGitlabMRs": "Refresh MR List",
   
   "view.jiraIssues": "Jira Issues",
-  "view.tasks": "Task Progress",
+  "view.tasks": "GitLab MR List",
   
   "config.jira.serverUrl": "Jira server URL (e.g., https://your-company.atlassian.net)",
   "config.jira.username": "Jira username",

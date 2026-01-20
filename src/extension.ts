@@ -24,6 +24,7 @@ import { CodeGenerationService } from './services/code-generation-service';
 import { CodeReviewService } from './services/code-review-service';
 import { OpenSpecGenerator } from './services/openspec-generator';
 import { JiraIssuesViewProvider } from './ui/views/jira-issues-view-provider';
+import { GitlabMrViewProvider } from './ui/views/gitlab-mr-view-provider';
 import { IssueDetailsPanel } from './ui/webviews/issue-details-panel';
 import { JiraChatParticipant } from './chat/jira-chat-participant';
 import { GitlabChatParticipant } from './chat/gitlab-chat-participant';
@@ -83,6 +84,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.window.registerTreeDataProvider('jiraGitlabHelperJiraIssues', jiraIssuesViewProvider)
   );
 
+  const gitlabMrViewProvider = new GitlabMrViewProvider(gitlabService, configManager, logger);
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('jiraGitlabHelperTasks', gitlabMrViewProvider)
+  );
+
   // Check configuration and prompt to open config panel if not configured
   void checkAndPromptConfiguration(context, configManager, logger);
 
@@ -116,6 +122,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     codeGenerationService,
     codeReviewService,
     jiraIssuesViewProvider,
+    gitlabMrViewProvider,
     logger
   );
 
@@ -146,6 +153,7 @@ function registerCommands(
   codeGenerationService: CodeGenerationService,
   codeReviewService: CodeReviewService,
   jiraIssuesViewProvider: JiraIssuesViewProvider,
+  gitlabMrViewProvider: GitlabMrViewProvider,
   logger: Logger
 ): void {
   // Initialize command handlers
@@ -215,6 +223,13 @@ function registerCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand('jiraGitlabHelper.refreshJiraIssues', () => {
       jiraIssuesViewProvider.refresh();
+    })
+  );
+
+  // Refresh GitLab MR List
+  context.subscriptions.push(
+    vscode.commands.registerCommand('jiraGitlabHelper.refreshGitlabMRs', () => {
+      gitlabMrViewProvider.refresh();
     })
   );
 

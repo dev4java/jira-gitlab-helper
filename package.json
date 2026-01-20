@@ -2,7 +2,7 @@
   "name": "jira-gitlab-helper",
   "displayName": "Jira GitLab Helper",
   "description": "Intelligent integration of Jira and GitLab with AI assistance for automated workflow from requirement analysis to code generation | 智能集成Jira和GitLab，通过AI辅助实现从需求分析到代码生成的全流程自动化开发工作流",
-  "version": "1.0.32",
+  "version": "1.0.33",
   "publisher": "yusw",
   "icon": "resources/icon.png",
   "repository": {
@@ -114,6 +114,12 @@
         "title": "%command.refreshIssues%",
         "category": "Jira GitLab Helper",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "jiraGitlabHelper.refreshGitlabMRs",
+        "title": "%command.refreshGitlabMRs%",
+        "category": "Jira GitLab Helper",
+        "icon": "$(refresh)"
       }
     ],
     "viewsContainers": {
@@ -153,6 +159,11 @@
           "command": "jiraGitlabHelper.refreshIssues",
           "when": "view == jiraGitlabHelperJiraIssues",
           "group": "navigation@3"
+        },
+        {
+          "command": "jiraGitlabHelper.refreshGitlabMRs",
+          "when": "view == jiraGitlabHelperTasks",
+          "group": "navigation@1"
         }
       ]
     },

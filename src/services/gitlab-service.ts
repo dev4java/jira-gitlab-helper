@@ -148,6 +148,16 @@ export class GitlabService {
     return await client.getMergeRequest(mrIid, projectId);
   }
 
+  public async getMergeRequests(
+    projectId?: string,
+    _scope?: 'assigned_to_me' | 'authored_by_me' | 'all',
+    _state?: 'opened' | 'closed' | 'merged' | 'all'
+  ): Promise<IGitlabMergeRequest[]> {
+    const client = await this.getClient();
+    // 目前 getMyMergeRequests 已经包含了 authored_by_me 和 assigned_to_me 的逻辑
+    return await client.getMyMergeRequests(projectId);
+  }
+
   public async getMergeRequestDiscussions(
     mrIid: number,
     projectId?: string

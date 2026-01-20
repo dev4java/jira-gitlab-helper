@@ -310,6 +310,57 @@ export class GitlabClient {
     return 'suggestion';
   }
 
+  /**
+   * 获取当前用户相关的MR列表
+   * @param projectId 项目ID
+   * @returns MR列表
+   */
+  public async getMyMergeRequests(projectId?: string): Promise<IGitlabMergeRequest[]> {
+    const id = projectId || this._projectId;
+    if (!id) {
+      throw new Error('未指定项目ID');
+    }
+
+    try {
+      this._logger.debug('Fetching user merge requests', { projectId: id });
+      
+      // 获取当前用户信息
+      const currentUser = await this._api.Users.current();
+      
+      // 获取当前用户创建的MR
+      const createdByMe = await this._api.MergeRequests.all({
+        projectId: id,
+        authorId: currentUser.id,
+        state: 'opened',
+        orderBy: 'updated_at',
+        sort: 'desc',
+      });
+      
+      // 获取需要当前用户审核的MR（作为reviewer或assignee）
+      const assignedToMe = await this._api.MergeRequests.all({
+        projectId: id,
+        state: 'opened',
+        reviewerId: currentUser.id,
+        orderBy: 'updated_at',
+        sort: 'desc',
+      });
+      
+      // 合并并去重
+      const mrMap = new Map<number, any>();
+      [...createdByMe, ...assignedToMe].forEach((mr: any) => {
+        mrMap.set(mr.iid, mr);
+      });
+      
+      const mergeRequests = Array.from(mrMap.values()).map(mr => this.transformMergeRequest(mr));
+      
+      this._logger.info(`Found ${mergeRequests.length} merge requests for current user`);
+      return mergeRequests;
+    } catch (error) {
+      this._logger.error('Failed to fetch user merge requests', error);
+      throw new GitlabConnectionError(`获取MR列表失败: ${String(error)}`);
+    }
+  }
+
   private transformMergeRequest(mr: any): IGitlabMergeRequest {
     return {
       iid: mr.iid,

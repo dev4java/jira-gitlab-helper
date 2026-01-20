@@ -15,9 +15,10 @@
   "command.searchIssues": "搜索问题",
   "command.clearSearchIssues": "清除搜索",
   "command.refreshIssues": "刷新列表",
+  "command.refreshGitlabMRs": "刷新MR列表",
   
-  "view.jiraIssues": "问题列表",
-  "view.tasks": "任务进度",
+  "view.jiraIssues": "Jira问题列表",
+  "view.tasks": "GitLab MR列表",
   
   "config.jira.serverUrl": "Jira服务器地址 (例如: https://your-company.atlassian.net)",
   "config.jira.username": "Jira用户名",
