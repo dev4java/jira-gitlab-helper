@@ -13,7 +13,7 @@
   "command.createMR": "创建Merge Request",
   "command.handleCRSuggestions": "处理Code Review建议",
   
-  "view.jiraIssues": "问题列表",
+  "view.jiraIssues": "Jira问题列表",
   "view.tasks": "任务进度",
   
   "config.jira.serverUrl": "Jira服务器地址 (例如: https://your-company.atlassian.net)",
