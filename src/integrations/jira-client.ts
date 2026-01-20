@@ -55,7 +55,7 @@ export class JiraClient {
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      timeout: 10000, // 10秒超时
+      timeout: 30000, // 30秒超时（Jira查询可能需要更长时间）
     });
   }
 
