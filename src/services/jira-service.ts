@@ -83,8 +83,9 @@ export class JiraService {
       this._logger.warn(`无法获取IOP-6255: ${error}`);
     }
     
-    // 查询2年内更新过的问题（730天），最多返回500条
-    const jql = `assignee = "${config.username}" AND updated >= -730d ORDER BY updated DESC`;
+    // 使用 currentUser() 函数自动匹配当前登录用户，避免用户名格式不匹配问题
+    // 同时查询经办人是当前用户或报告人是当前用户的问题
+    const jql = `(assignee = currentUser() OR reporter = currentUser()) AND updated >= -730d ORDER BY updated DESC`;
 
     this._logger.info(`Searching issues with JQL: ${jql}`);
     
