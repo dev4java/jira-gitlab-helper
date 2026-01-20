@@ -45,8 +45,7 @@ export class AnalyzeRequirementCommand {
       const confirmBranch = await vscode.window.showWarningMessage(
         `当前分支: ${currentBranch}\n\n是否在此分支上进行需求分析和代码生成？`,
         { modal: true },
-        '确认',
-        '取消'
+        '确认'
       );
 
       if (confirmBranch !== '确认') {
@@ -62,79 +61,140 @@ export class AnalyzeRequirementCommand {
           cancellable: false,
         },
         async (progress) => {
-          // Step 0: Check if OpenSpec CLI is installed
+          // Step 0: 检查OpenSpec环境
           progress.report({ message: '检查OpenSpec环境...' });
-          let isOpenSpecInstalled = await this._requirementAnalysisService.isOpenSpecInstalled();
           
-          if (!isOpenSpecInstalled) {
-            this._logger.info('OpenSpec CLI not installed, prompting user to install');
-            
-            // 询问用户是否要安装OpenSpec
-            const installChoice = await vscode.window.showWarningMessage(
-              '未检测到OpenSpec CLI工具\n\n' +
-              'OpenSpec用于生成规范化的需求文档和规格说明。\n\n' +
-              '• 如果安装：将生成完整的OpenSpec文档（推荐）\n' +
-              '• 如果跳过：只进行AI需求分析，不生成OpenSpec文档\n\n' +
-              '注意：跳过OpenSpec不影响基础的AI分析和代码生成功能。\n\n' +
-              '是否现在安装OpenSpec？',
+          // 1. 先检查项目是否已有OpenSpec目录结构
+          const hasOpenSpecDir = await this._requirementAnalysisService.hasOpenSpecDirectory(workspaceUri);
+          const isOpenSpecInitialized = hasOpenSpecDir && await this._requirementAnalysisService.isOpenSpecInitialized(workspaceUri);
+          
+          let isOpenSpecInstalled = false;
+          
+          if (isOpenSpecInitialized) {
+            // 项目已有OpenSpec目录且已初始化，直接使用
+            this._logger.info('Project has initialized OpenSpec directory, using it directly');
+            isOpenSpecInstalled = true; // 标记为已安装，可以生成OpenSpec文档
+          } else if (hasOpenSpecDir) {
+            // 有目录但未初始化
+            this._logger.info('Project has OpenSpec directory but not initialized');
+            const initChoice = await vscode.window.showWarningMessage(
+              '检测到openspec目录但未初始化\n\n' +
+              '需要初始化OpenSpec项目才能生成规范化的需求文档。\n\n' +
+              '是否初始化？',
               { modal: true },
-              '安装OpenSpec',
-              '跳过（仅AI分析）',
-              '取消'
+              '初始化',
+              '跳过（仅AI分析）'
             );
-
-            if (!installChoice || installChoice === '取消') {
+            
+            if (!initChoice) {
               void vscode.window.showInformationMessage('已取消需求分析');
               return;
-            } else if (installChoice === '安装OpenSpec') {
-              // 提供安装指引
-              const installMethod = await this.promptOpenSpecInstallation();
-              
-              if (installMethod === 'installed') {
-                // 重新检测并验证安装
-                this._logger.info('Re-checking OpenSpec installation after user confirmation');
-                this._requirementAnalysisService.resetOpenSpecCache();
-                isOpenSpecInstalled = await this._requirementAnalysisService.isOpenSpecInstalled();
-                
-                if (isOpenSpecInstalled) {
-                  void vscode.window.showInformationMessage('✅ OpenSpec CLI 安装成功！现在将生成完整的需求规格文档。');
-                  this._logger.info('OpenSpec installation verified successfully');
-                } else {
-                  const retryChoice = await vscode.window.showWarningMessage(
-                    '⚠️ 未检测到OpenSpec CLI\n\n' +
-                    '可能的原因：\n' +
-                    '• 安装尚未完成或失败\n' +
-                    '• 需要重新加载窗口\n' +
-                    '• 环境变量未生效\n\n' +
-                    '您可以：',
-                    { modal: true },
-                    '继续基础分析',
-                    '重新加载窗口',
-                    '取消'
-                  );
-                  
-                  if (retryChoice === '重新加载窗口') {
-                    await vscode.commands.executeCommand('workbench.action.reloadWindow');
-                    return;
-                  } else if (!retryChoice || retryChoice === '取消') {
-                    void vscode.window.showInformationMessage('已取消需求分析');
-                    return;
-                  }
-                  // 选择"继续基础分析"，isOpenSpecInstalled 保持 false
-                  this._logger.info('User chose to continue with basic analysis without OpenSpec');
-                }
-              } else if (installMethod === 'cancelled') {
+            } else if (initChoice === '初始化') {
+              // 检查CLI是否安装
+              isOpenSpecInstalled = await this._requirementAnalysisService.isOpenSpecInstalled();
+              if (!isOpenSpecInstalled) {
+                await vscode.window.showWarningMessage(
+                  '需要先安装OpenSpec CLI才能初始化项目\n\n' +
+                  '请运行：npm install -g openspec\n' +
+                  '然后在项目目录运行：openspec init',
+                  { modal: true },
+                  '好的'
+                );
                 void vscode.window.showInformationMessage('已取消需求分析');
                 return;
               }
-              // 如果是 'skip'，继续执行基础分析
-              if (installMethod === 'skip') {
-                this._logger.info('User skipped OpenSpec installation, continuing with basic analysis');
-              }
-            } else if (installChoice === '跳过（仅AI分析）') {
-              this._logger.info('User chose to skip OpenSpec and use basic AI analysis only');
+              // TODO: 这里可以自动运行 openspec init
+              void vscode.window.showInformationMessage('请在终端运行: openspec init');
             }
-            // 如果选择"跳过"，isOpenSpecInstalled保持false，继续执行
+            // 选择跳过，继续基础分析
+          } else {
+            // 2. 项目没有OpenSpec目录，检查CLI是否安装
+            this._logger.info('No OpenSpec directory, checking CLI installation');
+            isOpenSpecInstalled = await this._requirementAnalysisService.isOpenSpecInstalled();
+            
+            if (!isOpenSpecInstalled) {
+              // 3. CLI未安装，提示安装
+              this._logger.info('OpenSpec CLI not installed, prompting user to install');
+              
+              const installChoice = await vscode.window.showWarningMessage(
+                '未检测到OpenSpec CLI工具\n\n' +
+                'OpenSpec用于生成规范化的需求文档和规格说明。\n\n' +
+                '• 如果安装：将生成完整的OpenSpec文档（推荐）\n' +
+                '• 如果跳过：只进行AI需求分析，不生成OpenSpec文档\n\n' +
+                '注意：跳过OpenSpec不影响基础的AI分析和代码生成功能。\n\n' +
+                '是否现在安装OpenSpec？',
+                { modal: true },
+                '安装OpenSpec',
+                '跳过（仅AI分析）'
+              );
+
+              if (!installChoice) {
+                void vscode.window.showInformationMessage('已取消需求分析');
+                return;
+              } else if (installChoice === '安装OpenSpec') {
+                const installMethod = await this.promptOpenSpecInstallation();
+                
+                if (installMethod === 'installed') {
+                  this._logger.info('Re-checking OpenSpec installation after user confirmation');
+                  this._requirementAnalysisService.resetOpenSpecCache();
+                  isOpenSpecInstalled = await this._requirementAnalysisService.isOpenSpecInstalled();
+                  
+                  if (isOpenSpecInstalled) {
+                    void vscode.window.showInformationMessage('✅ OpenSpec CLI 安装成功！现在将生成完整的需求规格文档。');
+                    this._logger.info('OpenSpec installation verified successfully');
+                  } else {
+                    const retryChoice = await vscode.window.showWarningMessage(
+                      '⚠️ 未检测到OpenSpec CLI\n\n' +
+                      '可能的原因：\n' +
+                      '• 安装尚未完成或失败\n' +
+                      '• 需要重新加载窗口\n' +
+                      '• 环境变量未生效\n\n' +
+                      '您可以：',
+                      { modal: true },
+                      '继续基础分析',
+                      '重新加载窗口'
+                    );
+                    
+                    if (retryChoice === '重新加载窗口') {
+                      await vscode.commands.executeCommand('workbench.action.reloadWindow');
+                      return;
+                    } else if (!retryChoice) {
+                      void vscode.window.showInformationMessage('已取消需求分析');
+                      return;
+                    }
+                    this._logger.info('User chose to continue with basic analysis without OpenSpec');
+                  }
+                } else if (installMethod === 'cancelled') {
+                  void vscode.window.showInformationMessage('已取消需求分析');
+                  return;
+                }
+                if (installMethod === 'skip') {
+                  this._logger.info('User skipped OpenSpec installation, continuing with basic analysis');
+                }
+              } else if (installChoice === '跳过（仅AI分析）') {
+                this._logger.info('User chose to skip OpenSpec and use basic AI analysis only');
+              }
+            } else {
+              // 4. CLI已安装但项目未初始化
+              this._logger.info('OpenSpec CLI installed but project not initialized');
+              const initChoice = await vscode.window.showInformationMessage(
+                '检测到OpenSpec CLI但项目未初始化\n\n' +
+                '是否初始化OpenSpec项目？',
+                { modal: true },
+                '初始化',
+                '跳过（仅AI分析）'
+              );
+              
+              if (!initChoice) {
+                void vscode.window.showInformationMessage('已取消需求分析');
+                return;
+              } else if (initChoice === '初始化') {
+                // TODO: 自动运行 openspec init
+                void vscode.window.showInformationMessage('请在终端运行: openspec init');
+                // 提示用户初始化后可能需要重新执行
+              }
+              // 选择跳过，继续基础分析
+            }
           }
 
           // Step 1: Check if OpenSpec already exists (only if OpenSpec is installed)
@@ -256,8 +316,7 @@ export class AnalyzeRequirementCommand {
               `分析结果已保存为Markdown文档并已打开。\n` +
               `您可以查看分析内容后继续进行代码生成。`,
               { modal: true },
-              '继续生成代码',
-              '取消'
+              '继续生成代码'
             );
             
             if (nextAction === '继续生成代码') {
@@ -489,8 +548,7 @@ export class AnalyzeRequirementCommand {
         '安装完成后，请重新加载窗口或重启Cursor。',
         { modal: true },
         '复制命令',
-        '打开终端',
-        '取消'
+        '打开终端'
       ).then(async (action) => {
         if (action === '打开终端') {
           const terminal = vscode.window.createTerminal('OpenSpec 安装');
@@ -517,8 +575,7 @@ export class AnalyzeRequirementCommand {
         '请等待安装完成（通常需要1-2分钟）。\n\n' +
         '安装完成后请点击"已完成"按钮。',
         { modal: true },
-        '已完成',
-        '取消'
+        '已完成'
       );
 
       if (result === '已完成') {

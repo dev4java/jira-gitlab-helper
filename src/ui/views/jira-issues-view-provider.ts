@@ -99,7 +99,7 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
         
         // 警告：如果Jira中的问题总数超过返回的数量
         if (result.total > this._issues.length) {
-          this._logger.warn(`⚠️ Jira中有 ${result.total} 个问题，但只返回了 ${this._issues.length} 个。某些问题可能未显示。`);
+          this._logger.warn(`Jira中有 ${result.total} 个问题，但只返回了 ${this._issues.length} 个。某些问题可能未显示。`);
         }
 
         // 应用搜索过滤
@@ -295,20 +295,20 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
     // 1. REOPENED 状态强制标记为黄色
     if (isReopened) {
       colorStatus = 'warning';
-      colorPrefix = '🟡 ';
+      colorPrefix = '[重开] ';
     } 
     // 2. 根据提测日期状态设置颜色（仅未处理状态）
     else if (issue.plannedTestDate && group === 'pending') {
       colorStatus = this.getTestDateColorStatus(issue.plannedTestDate);
       switch (colorStatus) {
         case 'expired':
-          colorPrefix = '🔴 ';
+          colorPrefix = '[逾期] ';
           break;
         case 'warning':
-          colorPrefix = '🟡 ';
+          colorPrefix = '[紧急] ';
           break;
         case 'safe':
-          colorPrefix = '🟢 ';
+          colorPrefix = '';
           break;
       }
     }

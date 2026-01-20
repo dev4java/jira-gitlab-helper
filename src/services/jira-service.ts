@@ -84,7 +84,8 @@ export class JiraService {
     }
     
     // 使用 currentUser() 函数自动匹配当前登录用户，避免用户名格式不匹配问题
-    const jql = `assignee = currentUser() AND updated >= -730d ORDER BY updated DESC`;
+    // 查询最近1年更新的问题
+    const jql = `assignee = currentUser() AND updated >= -365d ORDER BY updated DESC`;
 
     this._logger.info(`Searching issues with JQL: ${jql}`);
     

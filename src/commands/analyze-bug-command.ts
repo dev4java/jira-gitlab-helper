@@ -45,8 +45,7 @@ export class AnalyzeBugCommand {
       const confirmBranch = await vscode.window.showWarningMessage(
         `当前分支: ${currentBranch}\n\n是否在此分支上进行Bug分析和修复？`,
         { modal: true },
-        '确认',
-        '取消'
+        '确认'
       );
 
       if (confirmBranch !== '确认') {

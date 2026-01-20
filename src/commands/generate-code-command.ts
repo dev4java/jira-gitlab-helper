@@ -189,8 +189,7 @@ export class GenerateCodeCommand {
         detail: message,
         modal: true,
       },
-      '应用变更',
-      '取消'
+      '应用变更'
     );
 
     return action === '应用变更';
@@ -224,8 +223,7 @@ export class GenerateCodeCommand {
         const result = await vscode.window.showWarningMessage(
           '无法自动检测Git分支。确定要在当前分支生成代码吗？',
           { modal: true },
-          '确定',
-          '取消'
+          '确定'
         );
         return result === '确定';
       }
@@ -236,8 +234,7 @@ export class GenerateCodeCommand {
         const result = await vscode.window.showWarningMessage(
           '未找到Git仓库。确定要继续吗？',
           { modal: true },
-          '确定',
-          '取消'
+          '确定'
         );
         return result === '确定';
       }
@@ -248,8 +245,7 @@ export class GenerateCodeCommand {
       const result = await vscode.window.showInformationMessage(
         `当前分支: ${currentBranch}\n\n确定要在此分支生成代码吗？`,
         { modal: true },
-        '确定',
-        '取消'
+        '确定'
       );
       
       return result === '确定';
@@ -260,8 +256,7 @@ export class GenerateCodeCommand {
       const result = await vscode.window.showWarningMessage(
         '无法检测当前Git分支。确定要继续吗？',
         { modal: true },
-        '确定',
-        '取消'
+        '确定'
       );
       return result === '确定';
     }

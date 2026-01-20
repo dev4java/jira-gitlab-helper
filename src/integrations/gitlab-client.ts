@@ -322,38 +322,36 @@ export class GitlabClient {
     }
 
     try {
-      this._logger.debug('Fetching user merge requests', { projectId: id });
+      this._logger.info(`正在获取MR列表，项目ID: ${id}`);
       
       // 获取当前用户信息
       const currentUser = await this._api.Users.current();
+      this._logger.debug(`当前用户: ${currentUser.username} (ID: ${currentUser.id})`);
       
-      // 获取当前用户创建的MR
-      const createdByMe = await this._api.MergeRequests.all({
+      // 使用MergeRequests.all获取项目的所有MR列表
+      const allMRs: any[] = await this._api.MergeRequests.all({
         projectId: id,
-        authorId: currentUser.id,
-        state: 'opened',
+        scope: 'all',
         orderBy: 'updated_at',
         sort: 'desc',
+        perPage: 50
       });
       
-      // 获取需要当前用户审核的MR（作为reviewer或assignee）
-      const assignedToMe = await this._api.MergeRequests.all({
-        projectId: id,
-        state: 'opened',
-        reviewerId: currentUser.id,
-        orderBy: 'updated_at',
-        sort: 'desc',
+      this._logger.debug(`项目共有${allMRs.length}个MR`);
+      
+      // 筛选出与当前用户相关的MR（作者、审核人或分配人）
+      const myMRs: any[] = allMRs.filter((mr: any) => {
+        const isAuthor = mr.author?.id === currentUser.id;
+        const isAssignee = mr.assignee?.id === currentUser.id;
+        const isInAssignees = mr.assignees?.some((a: any) => a.id === currentUser.id);
+        const isInReviewers = mr.reviewers?.some((r: any) => r.id === currentUser.id);
+        
+        return isAuthor || isAssignee || isInAssignees || isInReviewers;
       });
       
-      // 合并并去重
-      const mrMap = new Map<number, any>();
-      [...createdByMe, ...assignedToMe].forEach((mr: any) => {
-        mrMap.set(mr.iid, mr);
-      });
+      const mergeRequests = myMRs.map(mr => this.transformMergeRequest(mr));
       
-      const mergeRequests = Array.from(mrMap.values()).map(mr => this.transformMergeRequest(mr));
-      
-      this._logger.info(`Found ${mergeRequests.length} merge requests for current user`);
+      this._logger.info(`找到${mergeRequests.length}个与当前用户相关的MR`);
       return mergeRequests;
     } catch (error) {
       this._logger.error('Failed to fetch user merge requests', error);

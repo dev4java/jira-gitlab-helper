@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
 import { IGitlabMergeRequest } from '../../models/gitlab-models';
 import { Logger } from '../../utils/logger';
+import { GitConfigParser } from '../../utils/git-utils';
 import { ConfigurationManager } from '../../config/configuration-manager';
 import { GitlabService } from '../../services/gitlab-service';
-import { GitlabConnectionError } from '../../integrations/gitlab-client';
 
 export class GitlabMrViewProvider implements vscode.TreeDataProvider<MrTreeItem> {
   private readonly _onDidChangeTreeData = new vscode.EventEmitter<MrTreeItem | undefined | void>();
@@ -40,13 +40,48 @@ export class GitlabMrViewProvider implements vscode.TreeDataProvider<MrTreeItem>
       const config = this._configManager.getGitlabConfig();
       const token = await this._configManager.getGitlabToken();
       
-      if (!config.serverUrl || !token || !config.defaultProjectId) {
-        this._logger.warn('GitLab未配置，无法加载MR列表');
-        return [this.createMessageItem('请先配置GitLab连接')];
+      // 检查基本配置
+      if (!config.serverUrl || !token) {
+        this._logger.debug('GitLab服务器或Token未配置');
+        
+        // 检查当前工作区是否是GitLab项目
+        const isGitlab = await GitConfigParser.isGitlabProject();
+        if (!isGitlab) {
+          // 不是GitLab项目，不显示任何提示
+          this._logger.debug('当前工作区不是GitLab项目，不显示MR列表');
+          return [];
+        }
+        
+        // 是GitLab项目但未配置，提示配置
+        return [this.createMessageItem('请先配置GitLab连接（服务器地址和Token）')];
+      }
+
+      // 尝试获取项目ID：优先使用配置的，其次自动从Git配置中获取
+      let projectId: string | null = config.defaultProjectId;
+      if (!projectId) {
+        this._logger.debug('未配置defaultProjectId，尝试从当前工作区Git配置自动获取');
+        projectId = await GitConfigParser.getGitlabProjectIdFromWorkspace();
+        
+        if (!projectId) {
+          // 无法获取项目ID，检查是否是GitLab项目
+          const isGitlab = await GitConfigParser.isGitlabProject();
+          if (!isGitlab) {
+            // 不是GitLab项目，不显示提示
+            this._logger.debug('当前工作区不是GitLab项目');
+            return [];
+          }
+          
+          // 是GitLab项目但无法解析项目ID
+          return [this.createMessageItem('无法自动获取项目ID，请在配置中手动设置')];
+        }
+        
+        this._logger.info(`自动从Git配置获取到项目ID: ${projectId}`);
+      } else {
+        this._logger.info(`使用配置的项目ID: ${projectId}`);
       }
 
       // 获取MR列表 - 包括当前用户创建的和分配给当前用户审核的（已在GitlabClient中合并去重）
-      this._mergeRequests = await this._gitlabService.getMergeRequests(config.defaultProjectId);
+      this._mergeRequests = await this._gitlabService.getMergeRequests(projectId);
 
       if (this._mergeRequests.length === 0) {
         return [this.createMessageItem('暂无相关的Merge Request')];
@@ -55,11 +90,21 @@ export class GitlabMrViewProvider implements vscode.TreeDataProvider<MrTreeItem>
       // 直接显示所有MR
       return this._mergeRequests.map(mr => this.createMrItem(mr));
     } catch (error) {
-      this._logger.error('Failed to load GitLab MR list', error);
-      if (error instanceof GitlabConnectionError) {
-        return [this.createMessageItem(`加载失败: ${error.message}`)];
+      this._logger.error('加载GitLab MR列表失败', error);
+      
+      // 检查是否是404错误（项目不存在或无权限）
+      const errorMessage = String(error);
+      if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
+        this._logger.warn('项目ID可能不正确或无权限访问，请检查配置');
+        return [
+          this.createMessageItem('项目未找到或无权限'),
+          this.createMessageItem('请在设置中配置正确的项目ID')
+        ];
       }
-      return [this.createMessageItem('加载GitLab MR列表失败')];
+      
+      // 连接错误或其他错误，只显示简单提示
+      this._logger.warn('GitLab连接失败，请检查网络和配置');
+      return [this.createMessageItem('GitLab连接失败，请检查日志')];
     }
   }
 

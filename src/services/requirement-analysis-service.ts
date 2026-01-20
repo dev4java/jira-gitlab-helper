@@ -24,6 +24,36 @@ export class RequirementAnalysisService {
     this._openspecGenerator.resetInstallationCache();
   }
 
+  /**
+   * 检查项目是否已有OpenSpec目录结构
+   * @param workspaceUri 工作区URI
+   * @returns 是否存在openspec目录
+   */
+  public async hasOpenSpecDirectory(workspaceUri: vscode.Uri): Promise<boolean> {
+    try {
+      const openspecPath = path.join(workspaceUri.fsPath, 'openspec');
+      const stats = await fs.stat(openspecPath);
+      return stats.isDirectory();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * 检查OpenSpec项目是否已初始化（存在关键文件）
+   * @param workspaceUri 工作区URI
+   * @returns 是否已初始化
+   */
+  public async isOpenSpecInitialized(workspaceUri: vscode.Uri): Promise<boolean> {
+    try {
+      const projectMdPath = path.join(workspaceUri.fsPath, 'openspec', 'project.md');
+      await fs.access(projectMdPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   public async analyzeRequirement(issue: IJiraIssue): Promise<IRequirementAnalysis> {
     try {
       this._logger.info('Analyzing requirement', { issueKey: issue.key });

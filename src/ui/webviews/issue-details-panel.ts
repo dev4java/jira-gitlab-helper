@@ -410,10 +410,10 @@ export class IssueDetailsPanel {
 
     <div class="actions">
         <button class="action-button btn-requirement" onclick="analyzeRequirement()">
-            📋 需求分析
+            需求分析
         </button>
         <button class="action-button btn-bug" onclick="analyzeBug()">
-            🐛 Bug分析
+            Bug分析
         </button>
     </div>
 

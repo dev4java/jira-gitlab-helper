@@ -79,8 +79,7 @@ export class HandleCRSuggestionsCommand {
               `当前Git项目: ${projectId}\n\n` +
               `这个MR不属于当前项目，是否继续？`,
               { modal: true },
-              '继续处理',
-              '取消'
+              '继续处理'
             );
 
             if (proceed !== '继续处理') {
