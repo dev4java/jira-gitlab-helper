@@ -67,10 +67,64 @@ export class JiraService {
 
   public async searchMyIssues(): Promise<IJiraSearchResult> {
     const config = this._configManager.getJiraConfig();
-    const jql = `assignee = "${config.username}" AND status != Done ORDER BY updated DESC`;
+    // 不在 JQL 中排序，而是在客户端排序以实现更复杂的逻辑
+    const jql = `assignee = "${config.username}" AND status != Done`;
 
     const client = await this.getClient();
-    return await client.searchIssues(jql, 0, 50);
+    const result = await client.searchIssues(jql, 0, 100);
+    
+    // 应用自定义排序规则
+    result.issues = this.sortIssues(result.issues);
+    
+    return result;
+  }
+
+  /**
+   * 自定义排序规则：
+   * 1. 未解决状态优先
+   * 2. 有计划提测日期的，按提测日期升序（最近要提测的排在前面）
+   * 3. 没有提测日期的，按更新日期降序（最近更新的排在前面）
+   */
+  private sortIssues(issues: IJiraIssue[]): IJiraIssue[] {
+    return issues.sort((a, b) => {
+      // 1. 状态排序（已解决的状态会被排到后面）
+      const aResolved = this.isResolved(a.status);
+      const bResolved = this.isResolved(b.status);
+      
+      if (aResolved !== bResolved) {
+        return aResolved ? 1 : -1; // 未解决的在前
+      }
+
+      // 2. 按计划提测日期排序
+      const aHasTestDate = !!a.plannedTestDate;
+      const bHasTestDate = !!b.plannedTestDate;
+
+      if (aHasTestDate && bHasTestDate) {
+        // 都有提测日期，按日期升序（日期早的在前）
+        return new Date(a.plannedTestDate!).getTime() - new Date(b.plannedTestDate!).getTime();
+      }
+
+      if (aHasTestDate && !bHasTestDate) {
+        // a 有提测日期，b 没有 -> a 在前
+        return -1;
+      }
+
+      if (!aHasTestDate && bHasTestDate) {
+        // b 有提测日期，a 没有 -> b 在前
+        return 1;
+      }
+
+      // 3. 都没有提测日期，按更新时间降序（最近更新的在前）
+      return new Date(b.updated).getTime() - new Date(a.updated).getTime();
+    });
+  }
+
+  /**
+   * 判断状态是否为已解决
+   */
+  private isResolved(status: string): boolean {
+    const resolvedStatuses = ['done', 'resolved', '已解决', '完成', 'closed', '已关闭'];
+    return resolvedStatuses.some(s => status.toLowerCase().includes(s.toLowerCase()));
   }
 
   public async searchMyBugs(maxResults = 100): Promise<IJiraSearchResult> {

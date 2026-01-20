@@ -140,12 +140,7 @@ export class JiraClient {
     try {
       this._logger.debug('Fetching JIRA issue', { issueKey, apiVersion: this._apiVersion });
 
-      const response = await this._axiosInstance.get(`/issue/${issueKey}`, {
-        params: {
-          fields:
-            'summary,description,issuetype,status,assignee,reporter,priority,created,updated,labels,components',
-        },
-      });
+      const response = await this._axiosInstance.get(`/issue/${issueKey}`);
 
       const issue = this.transformIssue(response.data);
       this._logger.info('JIRA issue fetched successfully', { issueKey, type: issue.type });
@@ -165,12 +160,7 @@ export class JiraClient {
           
           try {
             // 重试一次
-            const retryResponse = await this._axiosInstance.get(`/issue/${issueKey}`, {
-              params: {
-                fields:
-                  'summary,description,issuetype,status,assignee,reporter,priority,created,updated,labels,components',
-              },
-            });
+            const retryResponse = await this._axiosInstance.get(`/issue/${issueKey}`);
             const issue = this.transformIssue(retryResponse.data);
             this._logger.info('JIRA issue fetched successfully after API version switch', { 
               issueKey, 
@@ -203,16 +193,7 @@ export class JiraClient {
         jql,
         startAt,
         maxResults,
-        fields: [
-          'summary',
-          'description',
-          'issuetype',
-          'status',
-          'assignee',
-          'priority',
-          'created',
-          'updated',
-        ],
+        fields: ['*all'],
       });
 
       const result: IJiraSearchResult = {
@@ -329,6 +310,25 @@ export class JiraClient {
   private transformIssue(data: any): IJiraIssue {
     const fields = data.fields || {};
 
+    // Extract custom fields
+    const customFields: Record<string, unknown> = {};
+    let plannedTestDate: string | undefined;
+    
+    // 遍历所有字段，找出自定义字段
+    for (const [key, value] of Object.entries(fields)) {
+      if (key.startsWith('customfield_')) {
+        customFields[key] = value;
+        
+        // 尝试找到计划提测日期字段（常见的命名）
+        if (value && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+          // 这可能是日期字段
+          if (!plannedTestDate) {
+            plannedTestDate = value;
+          }
+        }
+      }
+    }
+
     return {
       key: data.key,
       id: data.id,
@@ -353,6 +353,9 @@ export class JiraClient {
       updated: fields.updated,
       labels: fields.labels || [],
       components: (fields.components || []).map((c: { name: string }) => c.name),
+      customFields,
+      plannedTestDate: plannedTestDate || fields.duedate,
+      dueDate: fields.duedate,
     };
   }
 

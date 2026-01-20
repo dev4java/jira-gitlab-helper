@@ -75,18 +75,32 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
   }
 
   private createTooltip(issue: IJiraIssue): string {
-    return [
+    const lines = [
       `问题: ${issue.key}`,
       `标题: ${issue.summary}`,
       `类型: ${issue.type}`,
       `状态: ${issue.status}`,
       `优先级: ${issue.priority}`,
       issue.assignee ? `负责人: ${issue.assignee.displayName}` : '',
+      issue.plannedTestDate ? `计划提测: ${this.formatDate(issue.plannedTestDate)}` : '',
       '',
       '点击查看详情',
-    ]
-      .filter(Boolean)
-      .join('\n');
+    ];
+    
+    return lines.filter(Boolean).join('\n');
+  }
+
+  private formatDate(dateStr: string): string {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+    } catch {
+      return dateStr;
+    }
   }
 
   private getIconForIssueType(type: string): vscode.ThemeIcon {

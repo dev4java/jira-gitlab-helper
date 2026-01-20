@@ -27,6 +27,8 @@ export interface IJiraIssue {
   customFields?: Record<string, unknown>;
   labels?: string[];
   components?: string[];
+  plannedTestDate?: string; // 计划提测日期
+  dueDate?: string; // 到期日期
 }
 
 export interface IJiraSearchResult {

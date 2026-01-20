@@ -308,6 +308,24 @@ export class IssueDetailsPanel {
             
             <div class="metadata-label">更新时间:</div>
             <div class="metadata-value">${formatDate(issue.updated)}</div>
+            
+            ${
+              issue.plannedTestDate
+                ? `
+            <div class="metadata-label">计划提测日期:</div>
+            <div class="metadata-value">${formatDate(issue.plannedTestDate)}</div>
+            `
+                : ''
+            }
+            
+            ${
+              issue.dueDate
+                ? `
+            <div class="metadata-label">到期日期:</div>
+            <div class="metadata-value">${formatDate(issue.dueDate)}</div>
+            `
+                : ''
+            }
         </div>
     </div>
 
