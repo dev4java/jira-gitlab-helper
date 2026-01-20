@@ -24,6 +24,7 @@ import { CodeGenerationService } from './services/code-generation-service';
 import { CodeReviewService } from './services/code-review-service';
 import { OpenSpecGenerator } from './services/openspec-generator';
 import { JiraIssuesViewProvider } from './ui/views/jira-issues-view-provider';
+import { IssueDetailsPanel } from './ui/webviews/issue-details-panel';
 import { JiraChatParticipant } from './chat/jira-chat-participant';
 import { GitlabChatParticipant } from './chat/gitlab-chat-participant';
 
@@ -105,6 +106,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Register commands
   registerCommands(
     context,
+    context.extensionUri,
     configManager,
     jiraService,
     gitlabService,
@@ -134,6 +136,7 @@ export function deactivate(): void {
 
 function registerCommands(
   context: vscode.ExtensionContext,
+  extensionUri: vscode.Uri,
   configManager: ConfigurationManager,
   jiraService: JiraService,
   gitlabService: GitlabService,
@@ -218,7 +221,7 @@ function registerCommands(
   // Show Issue Details
   context.subscriptions.push(
     vscode.commands.registerCommand('jiraGitlabHelper.showIssueDetails', (issue) => {
-      void vscode.window.showInformationMessage(`Issue: ${issue.key} - ${issue.summary}`);
+      IssueDetailsPanel.createOrShow(extensionUri, logger, issue);
     })
   );
 
