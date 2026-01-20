@@ -12,9 +12,19 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
   private _issues: IJiraIssue[] = [];
   private _groupedIssues: Map<string, IJiraIssue[]> = new Map();
   
-  // 状态分类常量
-  private readonly PENDING_STATUSES = ['open', '开放', 'design', '设计中', '设计', 'announcement', '公告', 'in progress', '进行中', 'reopened', '重新打开', '重开'];
-  private readonly TESTING_STATUSES = ['resolved', '已解决', 'testing', '测试中', '测试'];
+  // 状态分类常量（使用精确匹配，避免误判）
+  private readonly PENDING_STATUSES = [
+    'open', 'opened', '开放',
+    'design', '设计中', '设计',
+    'announcement', '公告',
+    'in progress', '进行中', 'inprogress',
+    'reopened', '重新打开', '重开', 'reopen',
+    'to do', 'todo', '待办'
+  ];
+  private readonly TESTING_STATUSES = [
+    'resolved', '已解决',
+    'testing', '测试中', '测试'
+  ];
   // 已关闭状态：TESTED, CLOSE/CLOSED 等其他状态都归为已关闭
 
   constructor(
@@ -117,6 +127,8 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
 
     for (const issue of issues) {
       const group = this.getIssueGroup(issue.status);
+      this._logger.info(`Issue ${issue.key} status: "${issue.status}" -> group: ${group}`);
+      
       if (group === 'pending') {
         pending.push(issue);
       } else if (group === 'testing') {
@@ -176,19 +188,29 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
    * @returns 'pending' | 'testing' | 'closed'
    */
   private getIssueGroup(status: string): 'pending' | 'testing' | 'closed' {
-    const statusLower = status.toLowerCase();
+    const statusLower = status.toLowerCase().trim();
     
-    // 未处理
-    if (this.PENDING_STATUSES.some(s => statusLower === s || statusLower.includes(s))) {
-      return 'pending';
+    // 未处理：精确匹配或包含关键词
+    for (const s of this.PENDING_STATUSES) {
+      const sLower = s.toLowerCase();
+      if (statusLower === sLower || 
+          statusLower.includes(sLower) || 
+          sLower.includes(statusLower)) {
+        return 'pending';
+      }
     }
     
-    // 测试中
-    if (this.TESTING_STATUSES.some(s => statusLower === s || statusLower.includes(s))) {
-      return 'testing';
+    // 测试中：精确匹配或包含关键词
+    for (const s of this.TESTING_STATUSES) {
+      const sLower = s.toLowerCase();
+      if (statusLower === sLower || 
+          statusLower.includes(sLower) || 
+          sLower.includes(statusLower)) {
+        return 'testing';
+      }
     }
     
-    // 已关闭
+    // 已关闭：其他所有状态
     return 'closed';
   }
 
@@ -213,8 +235,13 @@ export class JiraIssuesViewProvider implements vscode.TreeDataProvider<JiraIssue
     item.contextValue = this.getContextValue(issue);
 
     // REOPENED 状态强制标记为黄色
-    const statusLower = issue.status.toLowerCase();
-    if (statusLower === 'reopened' || statusLower.includes('重新打开') || statusLower.includes('重开')) {
+    const statusLower = issue.status.toLowerCase().trim();
+    const isReopened = statusLower === 'reopened' || 
+                       statusLower === 'reopen' ||
+                       statusLower.includes('重新打开') || 
+                       statusLower.includes('重开');
+    
+    if (isReopened) {
       item.iconPath = this.getColoredIcon(issue.type, 'warning');
     } 
     // 根据提测日期状态设置颜色（仅未处理状态）
