@@ -84,9 +84,10 @@ export class GitConfigParser {
     }
 
     if (projectPath) {
-      // 对项目路径进行URL编码（GitLab API要求）
-      // 例如：group/project -> group%2Fproject
-      return encodeURIComponent(projectPath);
+      // 直接返回项目路径，不进行URL编码
+      // gitbeaker库会自动处理URL编码
+      // 例如：argos/argos-server（不要编码为argos%2Fargos-server）
+      return projectPath;
     }
 
     return null;

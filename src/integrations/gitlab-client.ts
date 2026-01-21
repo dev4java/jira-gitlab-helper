@@ -41,12 +41,15 @@ export class GitlabClient {
     this._logger = logger;
     this._projectId = config.projectId;
 
+    // 移除serverUrl末尾的斜杠，避免双斜杠问题
+    const serverUrl = config.serverUrl.replace(/\/+$/, '');
+
     this._api = new Gitlab({
-      host: config.serverUrl,
+      host: serverUrl,
       token: config.token,
     });
 
-    this._logger.info('GitLab client initialized', { serverUrl: config.serverUrl });
+    this._logger.info('GitLab client initialized', { serverUrl });
   }
 
   public async testConnection(): Promise<boolean> {
@@ -322,9 +325,8 @@ export class GitlabClient {
     }
 
     try {
-      // URL编码项目ID（支持 namespace/project 格式）
-      const encodedId = encodeURIComponent(id);
-      this._logger.info(`正在获取MR列表，项目ID: ${id}, 编码后: ${encodedId}`);
+      // 直接使用项目ID，gitbeaker会自动进行URL编码
+      this._logger.info(`正在获取MR列表，项目ID: ${id}`);
       
       // 获取当前用户信息
       const currentUser = await this._api.Users.current();
