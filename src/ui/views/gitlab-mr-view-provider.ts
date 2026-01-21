@@ -30,8 +30,8 @@ export class GitlabMrViewProvider implements vscode.TreeDataProvider<MrTreeItem>
   }
 
   public async getChildren(element?: MrTreeItem): Promise<MrTreeItem[]> {
+    // 只有根节点，不支持子节点
     if (element) {
-      // 暂不支持子节点
       return [];
     }
 
@@ -87,8 +87,22 @@ export class GitlabMrViewProvider implements vscode.TreeDataProvider<MrTreeItem>
         return [this.createMessageItem('暂无相关的Merge Request')];
       }
 
-      // 直接显示所有MR
-      return this._mergeRequests.map(mr => this.createMrItem(mr));
+      // 按修改时间倒序排序
+      this._mergeRequests.sort((a, b) => {
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      });
+
+      // 只显示待合并的MR（opened/locked状态）
+      const pendingMRs = this._mergeRequests.filter(
+        mr => mr.state === 'opened' || mr.state === 'locked'
+      );
+
+      if (pendingMRs.length === 0) {
+        return [this.createMessageItem('暂无待合并的Merge Request')];
+      }
+
+      // 直接返回待合并的MR列表，不需要分组
+      return pendingMRs.map(mr => this.createMrItem(mr));
     } catch (error) {
       this._logger.error('加载GitLab MR列表失败', error);
       
@@ -108,6 +122,7 @@ export class GitlabMrViewProvider implements vscode.TreeDataProvider<MrTreeItem>
     }
   }
 
+
   private createMessageItem(message: string): MrTreeItem {
     const item = new MrTreeItem(message, vscode.TreeItemCollapsibleState.None);
     item.contextValue = 'message';
@@ -120,9 +135,13 @@ export class GitlabMrViewProvider implements vscode.TreeDataProvider<MrTreeItem>
       vscode.TreeItemCollapsibleState.None
     );
 
-    item.description = `${mr.sourceBranch} → ${mr.targetBranch}`;
+    // 显示分支和更新时间
+    const timeInfo = this.formatDate(mr.updatedAt);
+    item.description = `${mr.sourceBranch} → ${mr.targetBranch} • ${timeInfo}`;
     item.tooltip = this.createTooltip(mr);
-    item.iconPath = new vscode.ThemeIcon('git-merge', this.getStateColor(mr.state));
+    
+    // 待合并状态统一使用git-pull-request图标
+    item.iconPath = new vscode.ThemeIcon('git-pull-request', new vscode.ThemeColor('terminal.ansiGreen'));
     item.contextValue = 'mergeRequest';
 
     // 点击打开MR详情
@@ -135,32 +154,36 @@ export class GitlabMrViewProvider implements vscode.TreeDataProvider<MrTreeItem>
     return item;
   }
 
-  private getStateColor(state: string): vscode.ThemeColor {
-    switch (state.toLowerCase()) {
-      case 'opened':
-        return new vscode.ThemeColor('terminal.ansiGreen');
-      case 'merged':
-        return new vscode.ThemeColor('terminal.ansiBlue');
-      case 'closed':
-        return new vscode.ThemeColor('errorForeground');
-      default:
-        return new vscode.ThemeColor('foreground');
-    }
-  }
 
   private createTooltip(mr: IGitlabMergeRequest): string {
+    const stateText = mr.state === 'locked' ? '待合并（已锁定）' : '待合并';
+
     const lines = [
-      `MR: !${mr.iid}`,
-      `标题: ${mr.title}`,
-      `状态: ${mr.state}`,
-      `作者: ${mr.author.name}`,
-      `分支: ${mr.sourceBranch} → ${mr.targetBranch}`,
-      `创建时间: ${this.formatDate(mr.createdAt)}`,
-      `更新时间: ${this.formatDate(mr.updatedAt)}`,
+      `MR !${mr.iid}: ${mr.title}`,
       '',
-      '点击在浏览器中打开',
+      `📊 状态: ${stateText}`,
+      `👤 作者: ${mr.author.name} (@${mr.author.username})`,
+      `🔀 分支: ${mr.sourceBranch} → ${mr.targetBranch}`,
+      '',
+      `📅 创建: ${this.formatDateFull(mr.createdAt)}`,
+      `🕐 更新: ${this.formatDateFull(mr.updatedAt)}`,
+      '',
+      '💡 点击在浏览器中查看详情',
     ];
     return lines.filter(Boolean).join('\n');
+  }
+
+  private formatDateFull(dateString: string): string {
+    const date = new Date(dateString);
+    const relative = this.formatDate(dateString);
+    const absolute = date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    return `${relative} (${absolute})`;
   }
 
   private formatDate(dateString: string): string {
