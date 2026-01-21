@@ -5,12 +5,14 @@ import { GitService } from '../services/git-service';
 import { Logger } from '../utils/logger';
 import { IJiraIssue } from '../models/jira-issue';
 import { IRequirementAnalysis } from '../models/requirement-analysis';
+import { ConfigurationManager } from '../config/configuration-manager';
 
 export class AnalyzeRequirementCommand {
   constructor(
     private readonly _jiraService: JiraService,
     private readonly _requirementAnalysisService: RequirementAnalysisService,
     private readonly _gitService: GitService,
+    private readonly _configManager: ConfigurationManager,
     private readonly _logger: Logger
   ) {}
 
@@ -27,8 +29,11 @@ export class AnalyzeRequirementCommand {
         }
       }
 
-      // Verify it's a requirement type issue
-      if (!this._jiraService.isRequirementIssue(issue)) {
+      // 判断是否为Confluence来源
+      const isConfluenceSource = (issue as any)._isConfluenceSource === true;
+
+      // Verify it's a requirement type issue (跳过Confluence来源的检查)
+      if (!isConfluenceSource && !this._jiraService.isRequirementIssue(issue)) {
         void vscode.window.showErrorMessage(
           `问题 ${issue.key} 不是需求类型 (${issue.type}),无法进行需求分析`
         );
@@ -378,21 +383,32 @@ export class AnalyzeRequirementCommand {
 
   private async promptForJiraIssue(): Promise<IJiraIssue | undefined> {
     const input = await vscode.window.showInputBox({
-      prompt: '请输入要分析的JIRA需求Key或完整URL',
-      placeHolder: 'PROJ-123 或 https://jira.example.com/browse/PROJ-123',
+      prompt: '请输入要分析的JIRA需求Key、URL 或 Confluence页面链接/pageId',
+      placeHolder: 'PROJ-123 | https://jira.example.com/browse/PROJ-123 | https://confluence.example.com/pages/viewpage.action?pageId=123456 | 123456',
       validateInput: (value) => {
         if (!value) {
-          return 'JIRA问题Key不能为空';
+          return '输入不能为空';
         }
+        const trimmed = value.trim();
+        
         // 支持 Issue Key 格式：PROJ-123
-        if (/^[A-Z]+-\d+$/i.test(value)) {
+        if (/^[A-Z]+-\d+$/i.test(trimmed)) {
           return null;
         }
-        // 支持完整 URL 格式：https://jira.example.com/browse/PROJ-123
-        if (/\/browse\/[A-Z]+-\d+$/i.test(value)) {
-        return null;
+        // 支持 Jira URL 格式：https://jira.example.com/browse/PROJ-123
+        if (/\/browse\/[A-Z]+-\d+$/i.test(trimmed)) {
+          return null;
         }
-        return '请输入有效的JIRA问题Key (例如: PROJ-123) 或完整URL';
+        // 支持 Confluence URL (包含pageId)
+        if (/pageId=\d+/.test(trimmed) || /\/pages\/\d+\//.test(trimmed)) {
+          return null;
+        }
+        // 支持纯数字pageId
+        if (/^\d+$/.test(trimmed)) {
+          return null;
+        }
+        
+        return '请输入有效的JIRA Key (PROJ-123)、JIRA URL、Confluence链接或Confluence页面ID';
       },
     });
 
@@ -400,8 +416,16 @@ export class AnalyzeRequirementCommand {
       return undefined;
     }
 
+    const trimmed = input.trim();
+
+    // 检查是否是Confluence链接或pageId
+    if (this.isConfluenceInput(trimmed)) {
+      // 处理Confluence输入，返回一个特殊的"虚拟Jira issue"
+      return await this.handleConfluenceInput(trimmed);
+    }
+
     // 从输入中提取 Issue Key
-    let issueKey = input.trim();
+    let issueKey = trimmed;
     const urlMatch = issueKey.match(/\/browse\/([A-Z]+-\d+)$/i);
     if (urlMatch) {
       issueKey = urlMatch[1];
@@ -416,6 +440,95 @@ export class AnalyzeRequirementCommand {
       },
       async () => {
         return await this._jiraService.getIssue(issueKey);
+      }
+    );
+  }
+
+  /**
+   * 判断输入是否为Confluence链接或pageId
+   */
+  private isConfluenceInput(input: string): boolean {
+    // Confluence URL
+    if (/pageId=\d+/.test(input) || /\/pages\/\d+\//.test(input) || input.includes('confluence')) {
+      return true;
+    }
+    // 纯数字pageId（假设超过6位数字很可能是Confluence pageId）
+    if (/^\d{6,}$/.test(input)) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * 处理Confluence输入，返回一个包含Confluence内容的虚拟Issue
+   */
+  private async handleConfluenceInput(input: string): Promise<IJiraIssue> {
+    return await vscode.window.withProgress(
+      {
+        location: vscode.ProgressLocation.Notification,
+        title: `正在获取Confluence页面...`,
+        cancellable: false,
+      },
+      async () => {
+        // 动态导入ConfluenceService（因为可能未配置）
+        const { ConfluenceService } = await import('../services/confluence-service');
+        const { ConfluenceClient } = await import('../integrations/confluence-client');
+        
+        const confluenceConfig = this._configManager.getConfluenceConfig();
+        const confluenceCredential = await this._configManager.getConfluenceCredential();
+        
+        if (!confluenceConfig.serverUrl || !confluenceConfig.username || !confluenceCredential) {
+          throw new Error('Confluence配置不完整，请先在设置中配置Confluence连接');
+        }
+        
+        const confluenceClient = new ConfluenceClient({
+          serverUrl: confluenceConfig.serverUrl,
+          username: confluenceConfig.username,
+          credential: confluenceCredential,
+          authType: confluenceConfig.authType || 'apiToken'
+        }, this._logger);
+        
+        const confluenceService = new ConfluenceService(confluenceClient, this._logger);
+        
+        let page;
+        // 判断是URL还是pageId
+        if (input.startsWith('http')) {
+          page = await confluenceService.getPageByUrl(input);
+          if (!page) {
+            throw new Error('无法从URL中提取Confluence页面ID');
+          }
+        } else {
+          // 尝试提取pageId（可能包含在URL中）
+          const extractedId = confluenceClient.extractPageIdFromUrl(input);
+          const pageId = extractedId || input;
+          page = await confluenceService.getPage(pageId);
+        }
+        
+        this._logger.info('Confluence page fetched for analysis', {
+          pageId: page.id,
+          title: page.title
+        });
+        
+        // 创建一个虚拟的Jira Issue，包含Confluence内容
+        const virtualIssue: IJiraIssue = {
+          key: `CONFLUENCE-${page.id}`,
+          summary: page.title,
+          description: page.body,
+          type: 'Story', // 默认作为Story处理
+          status: 'Open',
+          priority: 'Medium',
+          assignee: '',
+          reporter: '',
+          created: new Date().toISOString(),
+          updated: new Date().toISOString(),
+          labels: ['confluence'],
+          components: [],
+          url: page.url,
+          // 标记这是一个Confluence来源的虚拟issue
+          _isConfluenceSource: true
+        } as any;
+        
+        return virtualIssue;
       }
     );
   }
@@ -594,13 +707,22 @@ export class AnalyzeRequirementCommand {
   }
 
   private formatAnalysisForDisplay(issue: IJiraIssue, analysis: IRequirementAnalysis): string {
+    const isConfluenceSource = (issue as any)._isConfluenceSource === true;
+    
     const lines: string[] = [
       `# 需求分析报告: ${issue.key}`,
       '',
       `**标题**: ${issue.summary}`,
-      `**类型**: ${issue.type}`,
+      `**来源**: ${isConfluenceSource ? '📄 Confluence页面' : `🔖 Jira ${issue.type}`}`,
       `**状态**: ${issue.status}`,
       `**优先级**: ${issue.priority}`,
+    ];
+    
+    if (issue.url) {
+      lines.push(`**链接**: ${issue.url}`);
+    }
+    
+    lines.push(
       '',
       '---',
       '',
@@ -619,8 +741,8 @@ export class AnalyzeRequirementCommand {
       `**是否需要设计文档**: ${analysis.needsDesignDoc ? '是' : '否'}`,
       '',
       '## 验收标准',
-      '',
-    ];
+      ''
+    );
 
     if (analysis.acceptanceCriteria && analysis.acceptanceCriteria.length > 0) {
       analysis.acceptanceCriteria.forEach((criterion: string, index: number) => {
@@ -660,7 +782,14 @@ export class AnalyzeRequirementCommand {
       lines.push('无影响的功能');
     }
 
-    lines.push('', '---', '', '_此分析由 Jira GitLab Helper 基于 AI 生成_', '', '💡 **提示**: 安装 OpenSpec CLI 可以生成更详细的任务列表和规格文档。');
+    lines.push(
+      '', 
+      '---', 
+      '', 
+      `_此分析由 Jira GitLab Helper 基于 AI 生成${isConfluenceSource ? '（基于Confluence文档）' : ''}_`, 
+      '', 
+      '💡 **提示**: 安装 OpenSpec CLI 可以生成更详细的任务列表和规格文档。'
+    );
 
     return lines.join('\n');
   }

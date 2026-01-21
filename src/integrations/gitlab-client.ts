@@ -322,20 +322,24 @@ export class GitlabClient {
     }
 
     try {
-      this._logger.info(`正在获取MR列表，项目ID: ${id}`);
+      // URL编码项目ID（支持 namespace/project 格式）
+      const encodedId = encodeURIComponent(id);
+      this._logger.info(`正在获取MR列表，项目ID: ${id}, 编码后: ${encodedId}`);
       
       // 获取当前用户信息
       const currentUser = await this._api.Users.current();
       this._logger.debug(`当前用户: ${currentUser.username} (ID: ${currentUser.id})`);
       
-      // 使用MergeRequests.all获取项目的所有MR列表
+      // 使用MergeRequests.all获取项目的所有MR
+      this._logger.debug(`正在获取项目 ${id} 的MR列表`);
       const allMRs: any[] = await this._api.MergeRequests.all({
         projectId: id,
         scope: 'all',
         orderBy: 'updated_at',
         sort: 'desc',
-        perPage: 50
-      });
+        perPage: 50,
+        maxPages: 1
+      } as any);
       
       this._logger.debug(`项目共有${allMRs.length}个MR`);
       
@@ -353,9 +357,44 @@ export class GitlabClient {
       
       this._logger.info(`找到${mergeRequests.length}个与当前用户相关的MR`);
       return mergeRequests;
-    } catch (error) {
-      this._logger.error('Failed to fetch user merge requests', error);
-      throw new GitlabConnectionError(`获取MR列表失败: ${String(error)}`);
+    } catch (error: any) {
+      // 详细的错误分类和日志
+      this._logger.error('获取MR列表失败', {
+        projectId: id,
+        error: error.message,
+        statusCode: error.response?.statusCode || error.statusCode,
+        url: error.response?.url
+      });
+      
+      // 根据错误类型提供详细信息
+      if (error.response?.statusCode === 404 || error.statusCode === 404) {
+        throw new GitlabConnectionError(
+          `GitLab项目不存在或无法访问\n\n` +
+          `项目ID: ${id}\n\n` +
+          `可能的原因：\n` +
+          `1. 项目ID不正确（应为数字ID或"命名空间/项目名"）\n` +
+          `2. 您没有该项目的访问权限\n` +
+          `3. GitLab服务器地址配置错误\n\n` +
+          `请在GitLab网页上确认项目是否存在，并检查插件配置中的GitLab URL和Access Token`
+        );
+      } else if (error.response?.statusCode === 401 || error.statusCode === 401) {
+        throw new GitlabConnectionError(
+          `GitLab认证失败\n\n` +
+          `您的Access Token可能已过期或无效。\n\n` +
+          `请重新生成Token并更新配置：\n` +
+          `命令面板 -> "GitLab: Configure Connection"`
+        );
+      } else if (error.response?.statusCode === 403 || error.statusCode === 403) {
+        throw new GitlabConnectionError(
+          `GitLab权限不足\n\n` +
+          `您的Access Token没有足够的权限访问该项目。\n\n` +
+          `请确保Token具有以下权限：\n` +
+          `- read_api\n` +
+          `- read_repository`
+        );
+      }
+      
+      throw new GitlabConnectionError(`获取MR列表失败: ${error.message || String(error)}`);
     }
   }
 

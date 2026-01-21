@@ -209,12 +209,47 @@ export class JiraClient {
       });
 
       return result;
-    } catch (error) {
-      this._logger.error('Failed to search JIRA issues', { jql, error });
+    } catch (error: any) {
+      this._logger.error('Failed to search JIRA issues', { 
+        jql, 
+        error: error.message,
+        statusCode: error.response?.status,
+        serverUrl: this._serverUrl
+      });
 
       if (this.isAxiosError(error)) {
         if (error.response?.status === 400) {
-          throw new Error(`JQL查询语法错误: ${jql}`);
+          throw new Error(
+            `JQL查询语法错误\n\n` +
+            `查询语句: ${jql}\n\n` +
+            `请检查JQL语法是否正确。\n` +
+            `参考：https://support.atlassian.com/jira-service-management-cloud/docs/use-advanced-search-with-jira-query-language-jql/`
+          );
+        }
+        if (error.response?.status === 401) {
+          throw new JiraAuthenticationError(
+            `Jira认证失败\n\n` +
+            `您的凭据可能已过期或无效。\n\n` +
+            `请重新配置：命令面板 -> "Jira: Configure Connection"`
+          );
+        }
+        if (error.response?.status === 403) {
+          throw new JiraConnectionError(
+            `Jira权限不足\n\n` +
+            `您没有执行此查询的权限。\n\n` +
+            `请确保您的账户有相应项目的访问权限。`
+          );
+        }
+        if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+          throw new JiraConnectionError(
+            `Jira请求超时\n\n` +
+            `服务器: ${this._serverUrl}\n\n` +
+            `可能的原因：\n` +
+            `1. 网络连接不稳定\n` +
+            `2. Jira服务器响应缓慢\n` +
+            `3. 查询数据量过大\n\n` +
+            `建议：缩小查询范围或检查网络连接`
+          );
         }
         throw new JiraConnectionError(`搜索JIRA问题失败: ${error.message}`, error);
       }

@@ -16,6 +16,7 @@
   "command.clearSearchIssues": "清除搜索",
   "command.refreshIssues": "刷新列表",
   "command.refreshGitlabMRs": "刷新MR列表",
+  "command.validateConnections": "验证连接",
   
   "view.jiraIssues": "Jira问题列表",
   "view.tasks": "GitLab MR列表",

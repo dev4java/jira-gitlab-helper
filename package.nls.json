@@ -16,6 +16,7 @@
   "command.clearSearchIssues": "Clear Search",
   "command.refreshIssues": "Refresh Issues",
   "command.refreshGitlabMRs": "Refresh MR List",
+  "command.validateConnections": "Validate Connections",
   
   "view.jiraIssues": "Jira Issues",
   "view.tasks": "GitLab MR List",

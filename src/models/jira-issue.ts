@@ -29,6 +29,7 @@ export interface IJiraIssue {
   components?: string[];
   plannedTestDate?: string; // 计划提测日期
   dueDate?: string; // 到期日期
+  url?: string; // 问题的URL链接
 }
 
 export interface IJiraSearchResult {

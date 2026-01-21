@@ -23,6 +23,7 @@ import { BugAnalysisService } from './services/bug-analysis-service';
 import { CodeGenerationService } from './services/code-generation-service';
 import { CodeReviewService } from './services/code-review-service';
 import { OpenSpecGenerator } from './services/openspec-generator';
+import { ConfigurationValidationService } from './services/configuration-validation-service';
 import { JiraIssuesViewProvider } from './ui/views/jira-issues-view-provider';
 import { GitlabMrViewProvider } from './ui/views/gitlab-mr-view-provider';
 import { IssueDetailsPanel } from './ui/webviews/issue-details-panel';
@@ -78,6 +79,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const codeGenerationService = new CodeGenerationService(aiService, logger);
   const codeReviewService = new CodeReviewService(gitlabService, aiService, logger);
 
+  // Initialize validation service
+  const validationService = new ConfigurationValidationService(
+    configManager,
+    jiraService,
+    gitlabService,
+    logger
+  );
+
   // Initialize views
   const jiraIssuesViewProvider = new JiraIssuesViewProvider(jiraService, logger);
   context.subscriptions.push(
@@ -121,6 +130,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     bugAnalysisService,
     codeGenerationService,
     codeReviewService,
+    validationService,
     jiraIssuesViewProvider,
     gitlabMrViewProvider,
     logger
@@ -152,6 +162,7 @@ function registerCommands(
   bugAnalysisService: BugAnalysisService,
   codeGenerationService: CodeGenerationService,
   codeReviewService: CodeReviewService,
+  validationService: ConfigurationValidationService,
   jiraIssuesViewProvider: JiraIssuesViewProvider,
   gitlabMrViewProvider: GitlabMrViewProvider,
   logger: Logger
@@ -170,6 +181,7 @@ function registerCommands(
     jiraService,
     requirementAnalysisService,
     gitService,
+    configManager,
     logger
   );
   const analyzeBugCommand = new AnalyzeBugCommand(jiraService, bugAnalysisService, gitService, logger);
@@ -230,6 +242,23 @@ function registerCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand('jiraGitlabHelper.refreshGitlabMRs', () => {
       gitlabMrViewProvider.refresh();
+    })
+  );
+
+  // Validate Connections
+  context.subscriptions.push(
+    vscode.commands.registerCommand('jiraGitlabHelper.validateConnections', async () => {
+      await vscode.window.withProgress(
+        {
+          location: vscode.ProgressLocation.Notification,
+          title: '验证连接...',
+          cancellable: false
+        },
+        async () => {
+          const results = await validationService.validateAll();
+          await validationService.showValidationResults(results);
+        }
+      );
     })
   );
 
