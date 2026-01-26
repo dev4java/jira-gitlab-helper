@@ -132,7 +132,8 @@ export class GitlabMrViewProvider implements vscode.TreeDataProvider<MrTreeItem>
   private createMrItem(mr: IGitlabMergeRequest): MrTreeItem {
     const item = new MrTreeItem(
       `!${mr.iid}: ${mr.title}`,
-      vscode.TreeItemCollapsibleState.None
+      vscode.TreeItemCollapsibleState.None,
+      mr  // 传递MR数据
     );
 
     // 显示分支和更新时间
@@ -144,11 +145,11 @@ export class GitlabMrViewProvider implements vscode.TreeDataProvider<MrTreeItem>
     item.iconPath = new vscode.ThemeIcon('git-pull-request', new vscode.ThemeColor('terminal.ansiGreen'));
     item.contextValue = 'mergeRequest';
 
-    // 点击打开MR详情
+    // 点击时显示操作菜单
     item.command = {
-      command: 'vscode.open',
-      title: '打开MR',
-      arguments: [vscode.Uri.parse(mr.webUrl)],
+      command: 'jiraGitlabHelper.handleMrClick',
+      title: '选择操作',
+      arguments: [mr],
     };
 
     return item;
@@ -168,7 +169,7 @@ export class GitlabMrViewProvider implements vscode.TreeDataProvider<MrTreeItem>
       `📅 创建: ${this.formatDateFull(mr.createdAt)}`,
       `🕐 更新: ${this.formatDateFull(mr.updatedAt)}`,
       '',
-      '💡 点击在浏览器中查看详情',
+      '💡 点击选择操作：在浏览器中打开或处理Code Review',
     ];
     return lines.filter(Boolean).join('\n');
   }
@@ -210,7 +211,8 @@ export class GitlabMrViewProvider implements vscode.TreeDataProvider<MrTreeItem>
 class MrTreeItem extends vscode.TreeItem {
   constructor(
     public readonly label: string,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState
+    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+    public readonly mrData?: IGitlabMergeRequest  // 存储MR数据
   ) {
     super(label, collapsibleState);
   }

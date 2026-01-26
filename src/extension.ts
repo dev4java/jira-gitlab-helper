@@ -305,6 +305,42 @@ function registerCommands(
     })
   );
 
+  // Handle MR Click - Show action menu
+  context.subscriptions.push(
+    vscode.commands.registerCommand('jiraGitlabHelper.handleMrClick', async (mr: any) => {
+      const action = await vscode.window.showQuickPick(
+        [
+          {
+            label: '$(browser) 在浏览器中打开',
+            description: '查看MR详细信息',
+            value: 'open'
+          },
+          {
+            label: '$(code-review) 处理Code Review建议',
+            description: '使用AI分析并处理Code Review意见',
+            value: 'review'
+          }
+        ],
+        {
+          placeHolder: `选择对 MR !${mr.iid} 的操作`,
+          title: `MR !${mr.iid}: ${mr.title}`
+        }
+      );
+
+      if (!action) {
+        return;
+      }
+
+      if (action.value === 'open') {
+        // 在浏览器中打开MR
+        await vscode.env.openExternal(vscode.Uri.parse(mr.webUrl));
+      } else if (action.value === 'review') {
+        // 处理Code Review建议，传递MR URL
+        await handleCRSuggestionsCommand.execute(mr.webUrl);
+      }
+    })
+  );
+
   // Handle CR Suggestions
   context.subscriptions.push(
     vscode.commands.registerCommand('jiraGitlabHelper.handleCRSuggestions', async () => {

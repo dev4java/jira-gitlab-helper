@@ -12,20 +12,33 @@ export class HandleCRSuggestionsCommand {
     private readonly _logger: Logger
   ) {}
 
-  public async execute(): Promise<void> {
+  public async execute(mrUrl?: string): Promise<void> {
     try {
-      this._logger.info('Starting CR suggestions handling...');
+      this._logger.info('Starting CR suggestions handling...', { providedUrl: !!mrUrl });
 
       const workspaceUri = this.getWorkspaceUri();
       if (!workspaceUri) {
         throw new Error('未找到工作区');
       }
 
-      // Get MR IID
-      const mrIid = await this.promptForMRIid();
-      if (!mrIid) {
-        this._logger.info('CR suggestions handling cancelled by user');
-        return;
+      // Get MR IID - either from provided URL or prompt user
+      let mrIid: number | undefined;
+      
+      if (mrUrl) {
+        // MR URL was provided directly, extract IID from it
+        this._lastMRInput = mrUrl;
+        mrIid = this.extractMRIid(mrUrl);
+        if (!mrIid) {
+          throw new Error(`无法从URL中提取MR IID: ${mrUrl}`);
+        }
+        this._logger.info('Using provided MR URL', { mrUrl, mrIid });
+      } else {
+        // Prompt user for MR IID
+        mrIid = await this.promptForMRIid();
+        if (!mrIid) {
+          this._logger.info('CR suggestions handling cancelled by user');
+          return;
+        }
       }
 
       // Validate MR URL and extract project (if URL was provided)
